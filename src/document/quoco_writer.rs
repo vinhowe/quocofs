@@ -1,5 +1,5 @@
+use crate::document::finish::Finish;
 use crate::document::{EncrypterWriter, Key, CHUNK_LENGTH};
-use crate::finish::Finish;
 use brotli::CompressorWriter;
 use std::io;
 use std::io::Write;

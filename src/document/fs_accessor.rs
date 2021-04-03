@@ -1,6 +1,6 @@
+use crate::document::finish::Finish;
 use crate::document::{DocumentAccessor, DocumentHash, DocumentId, Key, QuocoReader, QuocoWriter};
 use crate::error::QuocoError;
-use crate::finish::Finish;
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read};

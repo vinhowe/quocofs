@@ -154,32 +154,5 @@ impl<R: Read> Read for DecryptReader<R> {
         };
         self.consume(nread);
         Ok(nread)
-
-        // if buf.is_empty() {
-        //     return Ok(0);
-        // }
-
-        // Total bytes read to `buf`
-        // let mut total_bytes_read_buf = 0;
-
-        // loop {
-        //     self.read_next_chunk()?;
-        //
-        //     if self.out_buf_len == 0 {
-        //         break;
-        //     }
-        //
-        //     total_bytes_read_buf +=
-        //         (&mut buf[total_bytes_read_buf..]).write(&self.out_buf[..self.out_buf_len])?;
-        //     self.read_len += total_bytes_read_buf;
-        //     // TODO: There has got to be a better way to do this
-        //     self.out_buf_len = 0;
-        //
-        //     if buf.len() - total_bytes_read_buf == 0 || self.eof {
-        //         break;
-        //     }
-        // };
-        //
-        // Ok(total_bytes_read_buf)
     }
 }

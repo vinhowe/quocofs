@@ -1,3 +1,8 @@
+use libsodium_sys::{
+    crypto_box_SEEDBYTES, crypto_hash_sha256_BYTES, crypto_pwhash_SALTBYTES,
+    crypto_secretstream_xchacha20poly1305_ABYTES,
+};
+
 pub use crate::document::accessor::DocumentAccessor;
 pub use crate::document::cached_accessor::CachedDocumentAccessor;
 pub use crate::document::decrypt_reader::DecryptReader;
@@ -5,15 +10,12 @@ pub use crate::document::encrypt_writer::EncrypterWriter;
 pub use crate::document::fs_accessor::FsDocumentAccessor;
 pub use crate::document::quoco_reader::QuocoReader;
 pub use crate::document::quoco_writer::QuocoWriter;
-use libsodium_sys::{
-    crypto_box_SEEDBYTES, crypto_hash_sha256_BYTES, crypto_pwhash_SALTBYTES,
-    crypto_secretstream_xchacha20poly1305_ABYTES,
-};
 
 mod accessor;
 mod cached_accessor;
 mod decrypt_reader;
 mod encrypt_writer;
+pub mod finish;
 mod fs_accessor;
 mod quoco_reader;
 mod quoco_writer;

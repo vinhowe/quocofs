@@ -1,8 +1,8 @@
 mod util;
 
 use crate::util::{output_vs_input_test, tests_data_dir, TEST_KEY};
+use quocofs::document::finish::Finish;
 use quocofs::document::{DecryptReader, EncrypterWriter, QuocoReader, QuocoWriter, CHUNK_LENGTH};
-use quocofs::finish::Finish;
 use std::io;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 

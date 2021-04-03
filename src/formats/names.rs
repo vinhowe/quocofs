@@ -18,27 +18,6 @@ impl Names {
         }
     }
 
-    // pub fn deserialize(data: Vec<u8>) -> Result<HashMap<DocumentId, String>, QuocoError> {}
-    //
-    // pub fn serialize(&mut self) -> Result<Vec<u8>, QuocoError> {
-    //     let mut data = Vec::new();
-    //     data.write(ReferenceFormat::info().magic_bytes)?;
-    //     for name in self.data.iter() {
-    //         data.write(name.0)?;
-    //         // Strip name of non-ASCII characters
-    //         data.write(
-    //             &name
-    //                 .1
-    //                 .chars()
-    //                 .filter(|c| c.is_ascii() && *c != '\0')
-    //                 .collect::<String>()
-    //                 .as_bytes(),
-    //         )?;
-    //         data.push(0u8);
-    //     }
-    //     Ok(data)
-    // }
-
     pub fn insert(&mut self, id: &DocumentId, name: &str) -> Option<String> {
         self.data.insert(*id, name.into())
     }
@@ -110,60 +89,3 @@ impl Default for Names {
         Names::new()
     }
 }
-
-// impl<W: Write> Index<String> for Names<W> {
-//     type Output = DocumentId;
-//
-//     fn index(&self, index: String) -> &Self::Output {
-//         self.data[&index]
-//     }
-// }
-
-// pub fn serialize_names<'a>(
-//     names_map: HashMap<DocumentId, String>,
-// ) -> Result<Vec<u8>, QuocoError> {
-//     let mut data = Vec::new();
-//     data.write(NAMES.magic_bytes)?;
-//     for name in names_map.iter() {
-//         data.write(name.0)?;
-//         // Strip name of non-ASCII characters
-//         data.write(
-//             &name
-//                 .1
-//                 .chars()
-//                 .filter(|c| c.is_ascii() && *c != '\0')
-//                 .collect::<String>()
-//                 .as_bytes(),
-//         )?;
-//         data.push(0u8);
-//     }
-//     Ok(data)
-// }
-//
-// pub fn deserialize_names(data: Vec<u8>) -> Result<HashMap<DocumentId, String>, QuocoError> {
-//     let mut names = HashMap::new();
-//     let mut data_reader = Cursor::new(data);
-//
-//     let mut magic_bytes = [0u8; 4];
-//     data_reader.read(&mut magic_bytes)?;
-//
-//     check_magic_bytes(&magic_bytes, &NAMES)?;
-//
-//     let mut uuid = [0u8; UUID_LENGTH];
-//
-//     loop {
-//         let uuid_bytes_read = data_reader.read(&mut uuid)?;
-//
-//         if uuid_bytes_read == 0 {
-//             break;
-//         }
-//
-//         let mut string_buffer = Vec::new();
-//         let name_bytes_read = data_reader.read_until(0u8, &mut string_buffer).unwrap();
-//
-//         let name = String::from_utf8(string_buffer[..name_bytes_read - 1].to_vec()).unwrap();
-//
-//         names.insert(uuid, name);
-//     }
-//     Ok(names)
-// }

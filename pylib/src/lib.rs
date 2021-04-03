@@ -7,7 +7,7 @@ use quocofs::document::{
     KEY_LENGTH, MAX_DATA_LENGTH, MAX_NAME_LENGTH, SALT_LENGTH, UUID_LENGTH,
 };
 use quocofs::error::QuocoError;
-use quocofs::finish::Finish;
+use quocofs::document::finish::Finish;
 use quocofs::session::{close_session, get_session, new_session};
 use quocofs::util::{generate_key, sha256};
 use quocofs::*;
@@ -184,17 +184,6 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     #[pyfn(_m, "loads")]
     fn loads_py(py: Python, data: Vec<u8>, key: [u8; KEY_LENGTH]) -> PyResult<&PyBytes> {
         let mut plaintext = Vec::new();
-        // decrypt_decompress_data(
-        //     &key,
-        //     &mut Cursor::new(data),
-        //     &mut decrypted_decompressed_data,
-        // )
-        // .map_err(|err| PyErr::from(PyQuocoError(err)))?;
-
-        // io::copy(
-        //     &mut QuocoReader::new(Cursor::new(data), &key),
-        //     &mut plaintext,
-        // )?;
         QuocoReader::new(Cursor::new(data), &key)
             .read_to_end(&mut plaintext)
             .map_err(|err| PyQuocoError(err.into()))?;
@@ -218,68 +207,6 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
 
         Ok(PyBytes::new(py, &hash))
     }
-
-    //
-    // #[pyfn(_m, "serialize_hashes")]
-    // fn serialize_hashes_py(
-    //     py: Python,
-    //     hashes: HashMap<[u8; UUID_LENGTH], [u8; HASH_LENGTH]>,
-    // ) -> PyResult<&PyBytes> {
-    //     Ok(PyBytes::new(
-    //         py,
-    //         &serialize_hashes(hashes.try_into().unwrap()).map_err(PyQuocoError)?,
-    //     ))
-    // }
-    //
-    // #[pyfn(_m, "deserialize_hashes")]
-    // fn deserialize_hashes_py(py: Python, data: Vec<u8>) -> PyResult<&PyDict> {
-    //     let py_hashes = PyDict::new(py);
-    //     deserialize_hashes(data)
-    //         .map_err(PyQuocoError)?
-    //         .iter()
-    //         .for_each(|item| {
-    //             py_hashes
-    //                 .set_item(PyBytes::new(py, item.0), PyBytes::new(py, item.1))
-    //                 .unwrap()
-    //         });
-    //     Ok(py_hashes)
-    // }
-    //
-    // #[pyfn(_m, "serialize_names")]
-    // fn serialize_names_py(
-    //     py: Python,
-    //     names: HashMap<[u8; UUID_LENGTH], String>,
-    // ) -> PyResult<&PyBytes> {
-    //     for value in names.values() {
-    //         if value.is_empty() {
-    //             return Err(exceptions::PyValueError::new_err(format!(
-    //                 "Name cannot be empty",
-    //             )));
-    //         }
-    //         if value.len() > MAX_NAME_LENGTH {
-    //             return Err(exceptions::PyValueError::new_err(format!(
-    //                 "Name is too long ({} > {} max).",
-    //                 value.len(),
-    //                 MAX_NAME_LENGTH
-    //             )));
-    //         }
-    //     }
-    //
-    //     Ok(PyBytes::new(
-    //         py,
-    //         &serialize_names(names).map_err(PyQuocoError)?,
-    //     ))
-    // }
-    //
-    // #[pyfn(_m, "deserialize_names")]
-    // fn deserialize_names_py(py: Python, data: Vec<u8>) -> PyResult<&PyDict> {
-    //     let py_names = PyDict::new(py);
-    //     deserialize_names(data)
-    //         .map_err(PyQuocoError)?
-    //         .iter()
-    //         .for_each(|item| py_names.set_item(PyBytes::new(py, item.0), item.1).unwrap());
-    //     Ok(py_names)
-    // }
 
     Ok(())
 }
