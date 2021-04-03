@@ -1,0 +1,19 @@
+[package]
+name = "quocofs-python"
+version = "0.1.0"
+authors = ["Vin Howe <24789592+vinhowe@users.noreply.github.com>"]
+edition = "2018"
+
+[lib]
+name = "quocofs"
+crate-type = ["cdylib"]
+
+[dependencies]
+quocofs = { path = "../" }
+
+[dependencies.pyo3]
+#version = "0.13.2"
+# Depends on https://github.com/PyO3/pyo3/pull/1457 to link correctly sometimes--I don't understand enough to know why
+git = "https://github.com/PyO3/pyo3"
+branch = "main"
+features = ["extension-module"]

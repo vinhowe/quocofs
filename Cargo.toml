@@ -1,0 +1,14 @@
+[package]
+name = "quocofs"
+version = "0.1.0"
+authors = ["Vin Howe <24789592+vinhowe@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+base64 = "0.13.0"
+uuid = { version = "0.8.2", features = ["v4"] }
+tempfile = "3.2.0"
+libsodium-sys = "0.2.6"
+brotli = { git = "https://github.com/dropbox/rust-brotli", tag = "1.0.110" }
+lazy_static = "1.4.0"
+owning_ref = "0.4.1"
