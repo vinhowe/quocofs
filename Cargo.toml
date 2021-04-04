@@ -12,3 +12,4 @@ libsodium-sys = "0.2.6"
 brotli = { git = "https://github.com/dropbox/rust-brotli", tag = "1.0.110" }
 lazy_static = "1.4.0"
 owning_ref = "0.4.1"
+google-storage1 = "2.0.0+20210330"

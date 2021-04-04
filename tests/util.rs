@@ -1,4 +1,4 @@
-use quocofs::document::Key;
+use quocofs::object::Key;
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;

@@ -1,4 +1,4 @@
-use crate::document::{DocumentAccessor, DocumentHash, DocumentId};
+use crate::object::{ObjectSource, ObjectHash, ObjectId};
 use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::io::{Cursor, Read};
@@ -8,17 +8,17 @@ use std::str;
 /// Max cache size in bytes (2 GiB)
 const MAX_CACHE_SIZE: usize = 1024 * 1024 * 1024 * 2;
 
-pub struct CachedDocumentAccessor<D: DocumentAccessor> {
+pub struct CachedObjectSource<D: ObjectSource> {
     inner: D,
-    cache: HashMap<DocumentId, Vec<u8>>,
-    insertion_order: VecDeque<DocumentId>,
-    /// Total size of all cached documents in bytes
+    cache: HashMap<ObjectId, Vec<u8>>,
+    insertion_order: VecDeque<ObjectId>,
+    /// Total size of all cached objects in bytes
     size: usize,
 }
 
-impl<D: DocumentAccessor> CachedDocumentAccessor<D> {
+impl<D: ObjectSource> CachedObjectSource<D> {
     pub fn new(accessor: D) -> Self {
-        CachedDocumentAccessor {
+        CachedObjectSource {
             inner: accessor,
             cache: HashMap::new(),
             insertion_order: VecDeque::new(),
@@ -32,7 +32,7 @@ impl<D: DocumentAccessor> CachedDocumentAccessor<D> {
         self.size = 0;
     }
 
-    fn remove(&mut self, id: &DocumentId) -> Option<Vec<u8>> {
+    fn remove(&mut self, id: &ObjectId) -> Option<Vec<u8>> {
         if !self.cache.contains_key(id) {
             return None;
         }
@@ -44,14 +44,14 @@ impl<D: DocumentAccessor> CachedDocumentAccessor<D> {
         self.size -= entry.len();
         self.insertion_order.remove(
             self.insertion_order.iter().position(|x| *x == *id).expect(
-                "Found document ID in cache, but couldn't find it in insertion order list.",
+                "Found object ID in cache, but couldn't find it in insertion order list.",
             ),
         );
 
         Some(entry)
     }
 
-    fn insert(&mut self, id: &DocumentId, data: Vec<u8>) -> Option<Vec<u8>> {
+    fn insert(&mut self, id: &ObjectId, data: Vec<u8>) -> Option<Vec<u8>> {
         let existing_data = self.remove(id);
 
         self.size += data.len();
@@ -64,7 +64,7 @@ impl<D: DocumentAccessor> CachedDocumentAccessor<D> {
 
     fn insert_reader<InR: Read>(
         &mut self,
-        id: &DocumentId,
+        id: &ObjectId,
         reader: &mut InR,
     ) -> io::Result<Option<Vec<u8>>> {
         let mut data = Vec::new();
@@ -72,17 +72,17 @@ impl<D: DocumentAccessor> CachedDocumentAccessor<D> {
         Ok(self.insert(id, data))
     }
 
-    fn load_into_cache(&mut self, id: &DocumentId) -> bool {
-        if let Some(mut reader) = self.inner.document(id) {
+    fn load_into_cache(&mut self, id: &ObjectId) -> bool {
+        if let Some(mut reader) = self.inner.object(id) {
             self.insert_reader(id, &mut reader)
-                .expect("Error when attempting to read into document cache.");
+                .expect("Error when attempting to read into object cache.");
             return true;
         }
 
         false
     }
 
-    /// Removes document entries until either the total cache size is under [`MAX_CACHE_SIZE`] or
+    /// Removes object entries until either the total cache size is under [`MAX_CACHE_SIZE`] or
     /// there is only one entry left.
     fn cull(&mut self) {
         while self.size > MAX_CACHE_SIZE && self.cache.len() > 1 {
@@ -95,7 +95,7 @@ impl<D: DocumentAccessor> CachedDocumentAccessor<D> {
     }
 }
 
-impl<D: DocumentAccessor> Index<&DocumentId> for CachedDocumentAccessor<D> {
+impl<D: ObjectSource> Index<&ObjectId> for CachedObjectSource<D> {
     type Output = [u8];
 
     fn index(&self, index: &[u8; 16]) -> &Self::Output {
@@ -103,11 +103,11 @@ impl<D: DocumentAccessor> Index<&DocumentId> for CachedDocumentAccessor<D> {
     }
 }
 
-impl<D: DocumentAccessor> DocumentAccessor for CachedDocumentAccessor<D> {
+impl<D: ObjectSource> ObjectSource for CachedObjectSource<D> {
     type OutReader = Cursor<Vec<u8>>;
 
-    fn document(&mut self, id: &DocumentId) -> Option<Cursor<Vec<u8>>> {
-        if !self.document_exists(id) {
+    fn object(&mut self, id: &ObjectId) -> Option<Cursor<Vec<u8>>> {
+        if !self.object_exists(id) {
             return None;
         }
 
@@ -119,25 +119,25 @@ impl<D: DocumentAccessor> DocumentAccessor for CachedDocumentAccessor<D> {
         Some(Cursor::new(self.cache[id].clone()))
     }
 
-    fn document_exists(&self, id: &DocumentId) -> bool {
+    fn object_exists(&self, id: &ObjectId) -> bool {
         // Checks if key exists in cache first because inner accessor might have to check the
-        //  filesystem. Maybe it would be a good idea to store a cached list of all document IDs,
+        //  filesystem. Maybe it would be a good idea to store a cached list of all object IDs,
         //  but I doubt it would provide any noticeable performance boost ever.
-        self.cache.contains_key(id) || self.inner.document_exists(id)
+        self.cache.contains_key(id) || self.inner.object_exists(id)
     }
 
-    fn delete_document(&mut self, id: &DocumentId) -> bool {
+    fn delete_object(&mut self, id: &ObjectId) -> bool {
         self.remove(id);
-        self.inner.delete_document(id)
+        self.inner.delete_object(id)
     }
 
-    fn create_document<R: Read>(&mut self, reader: &mut R) -> Option<DocumentId> {
-        if let Some(id) = self.inner.create_document(reader) {
+    fn create_object<R: Read>(&mut self, reader: &mut R) -> Option<ObjectId> {
+        if let Some(id) = self.inner.create_object(reader) {
             if self.insert_reader(&id, reader).is_err() {
                 // TODO: Panic seems appropriate here because this should never ever happen,
                 //  but the way the UUID is generated is ultimately up to the underlying
-                //  DocumentAccessor implementor. This is either defensive or paranoid.
-                panic!("Created a new document with an existing name");
+                //  ObjectAccessor implementor. This is either defensive or paranoid.
+                panic!("Created a new object with an existing name");
             }
             return Some(id);
         }
@@ -145,27 +145,27 @@ impl<D: DocumentAccessor> DocumentAccessor for CachedDocumentAccessor<D> {
         None
     }
 
-    fn modify_document<R: Read>(&mut self, id: &DocumentId, reader: &mut R) -> bool {
-        if !self.document_exists(id) {
+    fn modify_object<R: Read>(&mut self, id: &ObjectId, reader: &mut R) -> bool {
+        if !self.object_exists(id) {
             return false;
         }
 
         self.insert_reader(id, reader)
-            .expect("Error when reading into document cache.");
+            .expect("Error when reading into object cache.");
         true
     }
 
-    fn document_hash(&self, id: &[u8; 16]) -> Option<&DocumentHash> {
-        // Hashes and Names on FsDocumentAccessor act as caches
-        self.inner.document_hash(id)
+    fn object_hash(&self, id: &[u8; 16]) -> Option<&ObjectHash> {
+        // Hashes and Names on FsObjectAccessor act as caches
+        self.inner.object_hash(id)
     }
 
-    fn document_id_with_name(&self, name: &str) -> Option<&DocumentId> {
-        self.inner.document_id_with_name(name)
+    fn object_id_with_name(&self, name: &str) -> Option<&ObjectId> {
+        self.inner.object_id_with_name(name)
     }
 
-    fn set_document_name(&mut self, id: &DocumentId, name: &str) -> bool {
-        self.inner.set_document_name(id, name)
+    fn set_object_name(&mut self, id: &ObjectId, name: &str) -> bool {
+        self.inner.set_object_name(id, name)
     }
 
     fn flush(&mut self) -> bool {

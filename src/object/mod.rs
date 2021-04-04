@@ -3,13 +3,13 @@ use libsodium_sys::{
     crypto_secretstream_xchacha20poly1305_ABYTES,
 };
 
-pub use crate::document::accessor::DocumentAccessor;
-pub use crate::document::cached_accessor::CachedDocumentAccessor;
-pub use crate::document::decrypt_reader::DecryptReader;
-pub use crate::document::encrypt_writer::EncrypterWriter;
-pub use crate::document::fs_accessor::FsDocumentAccessor;
-pub use crate::document::quoco_reader::QuocoReader;
-pub use crate::document::quoco_writer::QuocoWriter;
+pub use crate::object::accessor::ObjectSource;
+pub use crate::object::cached_accessor::CachedObjectSource;
+pub use crate::object::decrypt_reader::DecryptReader;
+pub use crate::object::encrypt_writer::EncrypterWriter;
+pub use crate::object::fs_accessor::FsObjectAccessor;
+pub use crate::object::quoco_reader::QuocoReader;
+pub use crate::object::quoco_writer::QuocoWriter;
 
 mod accessor;
 mod cached_accessor;
@@ -31,6 +31,6 @@ pub const MAX_NAME_LENGTH: usize = 512;
 pub const SALT_LENGTH: usize = crypto_pwhash_SALTBYTES as usize;
 pub const HASH_LENGTH: usize = crypto_hash_sha256_BYTES as usize;
 pub const UUID_LENGTH: usize = 16;
-pub type DocumentId = [u8; UUID_LENGTH];
-pub type DocumentHash = [u8; HASH_LENGTH];
+pub type ObjectId = [u8; UUID_LENGTH];
+pub type ObjectHash = [u8; HASH_LENGTH];
 pub type Key = [u8; HASH_LENGTH];

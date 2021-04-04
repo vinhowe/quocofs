@@ -1,5 +1,5 @@
-use crate::document::finish::Finish;
-use crate::document::{DocumentAccessor, DocumentHash, DocumentId, Key, QuocoReader, QuocoWriter};
+use crate::object::finish::Finish;
+use crate::object::{ObjectSource, ObjectHash, ObjectId, Key, QuocoReader, QuocoWriter};
 use crate::error::QuocoError;
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use std::fs::{File, OpenOptions};
@@ -9,7 +9,7 @@ use std::str;
 use std::{fs, io};
 use uuid::Uuid;
 
-pub struct FsDocumentAccessor {
+pub struct FsObjectAccessor {
     pub names: Names,
     pub hashes: Hashes,
     path: PathBuf,
@@ -19,15 +19,15 @@ pub struct FsDocumentAccessor {
 
 pub const LOCK_FILE_NAME: &str = "quoco.lock";
 
-impl FsDocumentAccessor {
+impl FsObjectAccessor {
     pub fn open(path: &Path, key: &Key) -> Result<Self, QuocoError> {
         Self::check_no_lock(path)?;
         Self::touch_lock(path)?;
 
-        Ok(FsDocumentAccessor {
+        Ok(FsObjectAccessor {
             path: path.into(),
-            names: FsDocumentAccessor::load_reference_format(Names::new(), path, key)?,
-            hashes: FsDocumentAccessor::load_reference_format(Hashes::new(), path, key)?,
+            names: FsObjectAccessor::load_reference_format(Names::new(), path, key)?,
+            hashes: FsObjectAccessor::load_reference_format(Hashes::new(), path, key)?,
             key: *key,
             lock: true,
         })
@@ -47,8 +47,8 @@ impl FsDocumentAccessor {
         Ok(())
     }
 
-    fn modify_document_unchecked<R: Read>(&mut self, id: &DocumentId, reader: &mut R) -> bool {
-        let document_file = match OpenOptions::new()
+    fn modify_object_unchecked<R: Read>(&mut self, id: &ObjectId, reader: &mut R) -> bool {
+        let object_file = match OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
@@ -57,12 +57,12 @@ impl FsDocumentAccessor {
             Ok(val) => val,
             Err(_) => return false,
         };
-        let mut writer = QuocoWriter::new(document_file, &self.key);
+        let mut writer = QuocoWriter::new(object_file, &self.key);
         io::copy(reader, &mut writer)
-            .expect("Error when attempting to modify document on filesystem.");
+            .expect("Error when attempting to modify object on filesystem.");
         writer
             .finish()
-            .expect("Couldn't finish writing to document on filesystem.");
+            .expect("Couldn't finish writing to object on filesystem.");
         true
     }
 
@@ -110,20 +110,20 @@ impl FsDocumentAccessor {
     }
 }
 
-impl DocumentAccessor for FsDocumentAccessor {
+impl ObjectSource for FsObjectAccessor {
     type OutReader = QuocoReader<File>;
-    fn document(&mut self, id: &DocumentId) -> Option<Self::OutReader> {
-        let document_path = self.path.join(str::from_utf8(id).unwrap());
-        if !document_path.exists() {
+    fn object(&mut self, id: &ObjectId) -> Option<Self::OutReader> {
+        let object_path = self.path.join(str::from_utf8(id).unwrap());
+        if !object_path.exists() {
             return None;
         }
         Some(QuocoReader::new(
-            fs::File::open(document_path).unwrap(),
+            fs::File::open(object_path).unwrap(),
             &self.key,
         ))
     }
 
-    fn document_exists(&self, id: &DocumentId) -> bool {
+    fn object_exists(&self, id: &ObjectId) -> bool {
         self.check_lock().unwrap();
 
         self.path
@@ -131,49 +131,49 @@ impl DocumentAccessor for FsDocumentAccessor {
             .exists()
     }
 
-    fn delete_document(&mut self, id: &DocumentId) -> bool {
-        if !self.document_exists(id) {
+    fn delete_object(&mut self, id: &ObjectId) -> bool {
+        if !self.object_exists(id) {
             return false;
         }
 
-        // TODO: Is there any point in trying to shred encrypted documents?
+        // TODO: Is there any point in trying to shred encrypted objects?
         return fs::remove_file(self.path.join(Path::new(str::from_utf8(id).unwrap()))).is_ok();
     }
 
-    fn create_document<InR: Read>(&mut self, reader: &mut InR) -> Option<DocumentId> {
+    fn create_object<InR: Read>(&mut self, reader: &mut InR) -> Option<ObjectId> {
         self.check_lock().unwrap();
 
         let new_id = {
             let uuid = Uuid::new_v4();
             *uuid.as_bytes()
         };
-        if !self.modify_document_unchecked(&new_id, reader) {
+        if !self.modify_object_unchecked(&new_id, reader) {
             return None;
         }
         Some(new_id)
     }
 
-    fn modify_document<InR: Read>(&mut self, id: &DocumentId, reader: &mut InR) -> bool {
-        if !self.document_exists(id) {
+    fn modify_object<InR: Read>(&mut self, id: &ObjectId, reader: &mut InR) -> bool {
+        if !self.object_exists(id) {
             return false;
         }
 
-        self.modify_document_unchecked(id, reader)
+        self.modify_object_unchecked(id, reader)
     }
 
-    fn document_hash(&self, id: &DocumentId) -> Option<&DocumentHash> {
+    fn object_hash(&self, id: &ObjectId) -> Option<&ObjectHash> {
         self.check_lock().unwrap();
 
         self.hashes.get_hash(id)
     }
 
-    fn document_id_with_name(&self, name: &str) -> Option<&DocumentId> {
+    fn object_id_with_name(&self, name: &str) -> Option<&ObjectId> {
         self.check_lock().unwrap();
 
         self.names.get_id(name)
     }
 
-    fn set_document_name(&mut self, id: &[u8; 16], name: &str) -> bool {
+    fn set_object_name(&mut self, id: &[u8; 16], name: &str) -> bool {
         self.check_lock().unwrap();
 
         self.names.insert(id, name);
@@ -197,7 +197,7 @@ impl DocumentAccessor for FsDocumentAccessor {
     }
 }
 
-impl Drop for FsDocumentAccessor {
+impl Drop for FsObjectAccessor {
     fn drop(&mut self) {
         self.flush();
         self.unlock()

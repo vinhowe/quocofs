@@ -1,7 +1,7 @@
 mod util;
 
 use crate::util::{output_vs_reference_test, tests_data_dir, TEST_KEY};
-use quocofs::document::{DecryptReader, QuocoReader};
+use quocofs::object::{DecryptReader, QuocoReader};
 use std::io;
 
 #[test]

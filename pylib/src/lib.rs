@@ -2,12 +2,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
 use pyo3::{create_exception, PyContextProtocol};
 use pyo3::{exceptions, PyClass};
-use quocofs::document::{
-    DocumentAccessor, DocumentId, Key, QuocoReader, QuocoWriter, CHUNK_LENGTH, HASH_LENGTH,
+use quocofs::object::{
+    ObjectSource, ObjectId, Key, QuocoReader, QuocoWriter, CHUNK_LENGTH, HASH_LENGTH,
     KEY_LENGTH, MAX_DATA_LENGTH, MAX_NAME_LENGTH, SALT_LENGTH, UUID_LENGTH,
 };
 use quocofs::error::QuocoError;
-use quocofs::document::finish::Finish;
+use quocofs::object::finish::Finish;
 use quocofs::session::{close_session, get_session, new_session};
 use quocofs::util::{generate_key, sha256};
 use quocofs::*;
@@ -67,54 +67,54 @@ impl PySession {
         }
     }
 
-    fn create_document<'p>(&self, py: Python<'p>, data: Vec<u8>) -> PyResult<&'p PyBytes> {
+    fn create_object<'p>(&self, py: Python<'p>, data: Vec<u8>) -> PyResult<&'p PyBytes> {
         // TODO: Holy... figure out how to pull this out into its own function
-        let document_id = get_session(&self.id)
+        let object_id = get_session(&self.id)
             .borrow_mut()
             .cache
-            .create_document(&mut Cursor::new(data))
+            .create_object(&mut Cursor::new(data))
             // TODO: This error handling is awful and I hate it
-            .expect("Couldn't create a document!");
-        Ok(PyBytes::new(py, &document_id))
+            .expect("Couldn't create a object!");
+        Ok(PyBytes::new(py, &object_id))
     }
 
-    fn modify_document(&self, id: DocumentId, data: Vec<u8>) -> PyResult<bool> {
+    fn modify_object(&self, id: ObjectId, data: Vec<u8>) -> PyResult<bool> {
         Ok(get_session(&self.id)
             .borrow_mut()
             .cache
-            .modify_document(&id, &mut Cursor::new(data)))
+            .modify_object(&id, &mut Cursor::new(data)))
     }
 
-    fn delete_document(&self, id: DocumentId) -> bool {
+    fn delete_object(&self, id: ObjectId) -> bool {
         get_session(&self.id)
             .borrow_mut()
             .cache
-            .delete_document(&id)
+            .delete_object(&id)
     }
 
-    fn document_id_with_name(&self, name: &str) -> Option<DocumentId> {
+    fn object_id_with_name(&self, name: &str) -> Option<ObjectId> {
         get_session(&self.id)
             .borrow()
             .cache
-            .document_id_with_name(name)
+            .object_id_with_name(name)
             .copied()
     }
 
-    fn set_document_name(&self, id: DocumentId, name: &str) -> bool {
+    fn set_object_name(&self, id: ObjectId, name: &str) -> bool {
         get_session(&self.id)
             .borrow_mut()
             .cache
-            .set_document_name(&id, name)
+            .set_object_name(&id, name)
     }
 
     fn flush(&self) -> bool {
         get_session(&self.id).borrow_mut().cache.flush()
     }
 
-    fn document_temp_file(&self, id: DocumentId) -> PyResult<String> {
+    fn object_temp_file(&self, id: ObjectId) -> PyResult<String> {
         get_session(&self.id)
             .borrow_mut()
-            .document_temp_file(&id)
+            .object_temp_file(&id)
             .map(|path| path.to_str().unwrap().to_string())
             .map_err(|err| PyQuocoError(err).into())
         // TODO: This error handling is awful and I hate it

@@ -1,4 +1,4 @@
-use crate::document::{MAX_DATA_LENGTH, MAX_NAME_LENGTH};
+use crate::object::{MAX_DATA_LENGTH, MAX_NAME_LENGTH};
 use crate::formats::ReferenceFormatSpecification;
 use std::borrow::Borrow;
 

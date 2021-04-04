@@ -1,4 +1,4 @@
-use crate::document::{DocumentHash, DocumentId, HASH_LENGTH, UUID_LENGTH};
+use crate::object::{ObjectHash, ObjectId, HASH_LENGTH, UUID_LENGTH};
 use crate::error::QuocoError;
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, HASHES};
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::mem::size_of;
 use std::ops::Index;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-type HashesDataType = HashMap<DocumentId, DocumentHash>;
+type HashesDataType = HashMap<ObjectId, ObjectHash>;
 
 pub struct Hashes {
     last_updated: SystemTime,
@@ -23,15 +23,15 @@ impl Hashes {
         }
     }
 
-    pub fn insert(&mut self, id: &DocumentId, hash: &DocumentHash) -> Option<DocumentHash> {
+    pub fn insert(&mut self, id: &ObjectId, hash: &ObjectHash) -> Option<ObjectHash> {
         self.data.insert(*id, *hash)
     }
 
-    pub fn get_hash(&self, id: &DocumentId) -> Option<&DocumentHash> {
+    pub fn get_hash(&self, id: &ObjectId) -> Option<&ObjectHash> {
         self.data.get(id)
     }
 
-    pub fn get_id(&self, hash: &DocumentHash) -> Option<&DocumentId> {
+    pub fn get_id(&self, hash: &ObjectHash) -> Option<&ObjectId> {
         self.data.iter().find(|x| *x.1 == *hash).map(|x| x.0)
     }
 }
@@ -82,10 +82,10 @@ impl ReferenceFormat for Hashes {
     }
 }
 
-impl Index<DocumentId> for Hashes {
-    type Output = DocumentHash;
+impl Index<ObjectId> for Hashes {
+    type Output = ObjectHash;
 
-    fn index(&self, index: DocumentId) -> &Self::Output {
+    fn index(&self, index: ObjectId) -> &Self::Output {
         &self.get_hash(&index).unwrap()
     }
 }

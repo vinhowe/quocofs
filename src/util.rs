@@ -1,4 +1,4 @@
-use crate::document::{CHUNK_LENGTH, SALT_LENGTH};
+use crate::object::{CHUNK_LENGTH, SALT_LENGTH};
 use crate::error::QuocoError;
 use crate::error::QuocoError::{KeyGenerationError, UndeterminedError};
 use libsodium_sys::{

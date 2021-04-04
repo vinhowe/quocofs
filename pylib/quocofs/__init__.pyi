@@ -17,19 +17,19 @@ class Session:
     def __new__(cls, path: str, key: bytes):
         pass
 
-    def create_document(self, data: bytes) -> bytes:
+    def create_object(self, data: bytes) -> bytes:
         pass
 
-    def modify_document(self, id: bytes, data: bytes) -> bool:
+    def modify_object(self, id: bytes, data: bytes) -> bool:
         pass
 
-    def delete_document(self, id: bytes) -> bool:
+    def delete_object(self, id: bytes) -> bool:
         pass
 
-    def document_id_with_name(self, name: str) -> typing.Optional[bytes]:
+    def object_id_with_name(self, name: str) -> typing.Optional[bytes]:
         pass
 
-    def set_document_name(self, id: bytes, name: str) -> bool:
+    def set_object_name(self, id: bytes, name: str) -> bool:
         pass
 
     def flush(self) -> bool:
@@ -38,7 +38,7 @@ class Session:
     def release_lock(self) -> bool:
         pass
 
-    def document_temp_file(self, id: bytes) -> str:
+    def object_temp_file(self, id: bytes) -> str:
         pass
 
     def clear_temp_files(self) -> None:

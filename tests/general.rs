@@ -1,6 +1,6 @@
 use base64::encode;
 use libsodium_sys::randombytes_buf;
-use quocofs::document::SALT_LENGTH;
+use quocofs::object::SALT_LENGTH;
 use std::mem::MaybeUninit;
 
 #[test]

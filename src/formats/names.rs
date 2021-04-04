@@ -1,11 +1,11 @@
-use crate::document::{DocumentId, UUID_LENGTH};
+use crate::object::{ObjectId, UUID_LENGTH};
 use crate::error::QuocoError;
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, NAMES};
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write};
 use std::ops::Index;
 
-type NamesDataType = HashMap<DocumentId, String>;
+type NamesDataType = HashMap<ObjectId, String>;
 
 pub struct Names {
     data: NamesDataType,
@@ -18,15 +18,15 @@ impl Names {
         }
     }
 
-    pub fn insert(&mut self, id: &DocumentId, name: &str) -> Option<String> {
+    pub fn insert(&mut self, id: &ObjectId, name: &str) -> Option<String> {
         self.data.insert(*id, name.into())
     }
 
-    pub fn get_name(&self, id: &DocumentId) -> Option<&String> {
+    pub fn get_name(&self, id: &ObjectId) -> Option<&String> {
         self.data.get(id)
     }
 
-    pub fn get_id(&self, name: &str) -> Option<&DocumentId> {
+    pub fn get_id(&self, name: &str) -> Option<&ObjectId> {
         self.data.iter().find(|x| *x.1 == name).map(|x| x.0)
     }
 }
@@ -76,7 +76,7 @@ impl ReferenceFormat for Names {
     }
 }
 
-impl Index<DocumentId> for Names {
+impl Index<ObjectId> for Names {
     type Output = String;
 
     fn index(&self, index: [u8; 16]) -> &Self::Output {

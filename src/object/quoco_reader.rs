@@ -1,4 +1,4 @@
-use crate::document::{DecryptReader, Key, CHUNK_LENGTH};
+use crate::object::{DecryptReader, Key, CHUNK_LENGTH};
 use std::io;
 use std::io::Read;
 

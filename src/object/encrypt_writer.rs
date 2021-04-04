@@ -1,5 +1,5 @@
-use crate::document::finish::Finish;
-use crate::document::{Key, CHUNK_LENGTH, ENCRYPTED_CHUNK_LENGTH};
+use crate::object::finish::Finish;
+use crate::object::{Key, CHUNK_LENGTH, ENCRYPTED_CHUNK_LENGTH};
 use crate::error::{EncryptionErrorType, QuocoError};
 use libsodium_sys::{
     crypto_secretstream_xchacha20poly1305_HEADERBYTES,

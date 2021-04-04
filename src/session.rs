@@ -1,5 +1,5 @@
-use crate::document::{
-    CachedDocumentAccessor, DocumentAccessor, DocumentId, FsDocumentAccessor, Key,
+use crate::object::{
+    CachedObjectSource, ObjectSource, ObjectId, FsObjectAccessor, Key,
 };
 use crate::error::QuocoError;
 use crate::util::{delete_file, is_shred_available, shred_file};
@@ -16,18 +16,18 @@ use tempfile::NamedTempFile;
 use uuid::Uuid;
 
 lazy_static! {
-    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsDocumentAccessor>>>> =
+    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectAccessor >>>> =
         Mutex::new(HashMap::new());
 }
 
 type SessionMutexGuard<'a> = OwningRef<
-    MutexGuard<'a, HashMap<UuidBytes, RefCell<Session<FsDocumentAccessor>>, RandomState>>,
-    RefCell<Session<FsDocumentAccessor>>,
+    MutexGuard<'a, HashMap<UuidBytes, RefCell<Session<FsObjectAccessor>>, RandomState>>,
+    RefCell<Session<FsObjectAccessor>>,
 >;
 
 pub fn new_session(path: &str, key: &Key) -> Result<UuidBytes, QuocoError> {
     let uuid = *Uuid::new_v4().as_bytes();
-    let new_session = Session::new(FsDocumentAccessor::open(
+    let new_session = Session::new(FsObjectAccessor::open(
         PathBuf::from(path).as_path(),
         key,
     )?)?;
@@ -51,29 +51,26 @@ pub fn clear_sessions() {
     SESSIONS.lock().unwrap().clear()
 }
 
-pub struct Session<D: DocumentAccessor> {
-    pub cache: CachedDocumentAccessor<D>,
-    temp_files: HashMap<DocumentId, PathBuf>,
+pub struct Session<D: ObjectSource> {
+    pub cache: CachedObjectSource<D>,
+    temp_files: HashMap<ObjectId, PathBuf>,
 }
 
-impl<D: DocumentAccessor> Session<D> {
+impl<D: ObjectSource> Session<D> {
     pub fn new(accessor: D) -> Result<Self, QuocoError> {
         Ok(Session {
-            cache: CachedDocumentAccessor::new(accessor),
+            cache: CachedObjectSource::new(accessor),
             temp_files: HashMap::new(),
         })
     }
 
-    pub fn document_temp_file(&mut self, id: &DocumentId) -> Result<PathBuf, QuocoError> {
-        // TODO: We need a nicer interface for loading documents and caching them
+    pub fn object_temp_file(&mut self, id: &ObjectId) -> Result<PathBuf, QuocoError> {
         if self.temp_files.contains_key(id) {
             return Ok(self.temp_files[id].clone());
         }
 
         let mut temp_file = NamedTempFile::new()?;
-
-        io::copy(&mut self.cache.document(id).unwrap(), &mut temp_file)?;
-
+        io::copy(&mut self.cache.object(id).unwrap(), &mut temp_file)?;
         Ok(temp_file.path().into())
     }
 
