@@ -1,6 +1,6 @@
-use crate::Result;
-use crate::object::{Key, CHUNK_LENGTH, ENCRYPTED_CHUNK_LENGTH};
 use crate::error::{EncryptionErrorType, QuocoError};
+use crate::object::{Key, CHUNK_LENGTH, ENCRYPTED_CHUNK_LENGTH};
+use crate::Result;
 use libsodium_sys::{
     crypto_secretstream_xchacha20poly1305_HEADERBYTES,
     crypto_secretstream_xchacha20poly1305_TAG_FINAL,

@@ -1,12 +1,12 @@
 pub use uuid::Bytes as UuidBytes;
 
-pub use crate::session::SESSIONS;
 use crate::error::QuocoError;
+pub use crate::session::SESSIONS;
 use std::result;
 
-pub mod object;
 pub mod error;
 pub mod formats;
+pub mod object;
 pub mod session;
 pub mod util;
 

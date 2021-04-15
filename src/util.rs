@@ -1,6 +1,6 @@
-use crate::Result;
 use crate::error::QuocoError::{KeyGenerationError, UndeterminedError};
 use crate::object::{CHUNK_LENGTH, SALT_LENGTH};
+use crate::Result;
 use libsodium_sys::{
     crypto_box_SEEDBYTES, crypto_hash_sha256_final, crypto_hash_sha256_init,
     crypto_hash_sha256_state, crypto_hash_sha256_update, crypto_pwhash, crypto_pwhash_ALG_DEFAULT,

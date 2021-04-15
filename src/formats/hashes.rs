@@ -1,6 +1,6 @@
-use crate::Result;
-use crate::object::{ObjectHash, ObjectId, HASH_LENGTH, UUID_LENGTH};
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, HASHES};
+use crate::object::{ObjectHash, ObjectId, HASH_LENGTH, UUID_LENGTH};
+use crate::Result;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::{BufRead, Read, Write};

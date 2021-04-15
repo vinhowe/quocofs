@@ -17,7 +17,7 @@ use std::{env, io};
 use uuid::Uuid;
 
 lazy_static! {
-    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectSource, GoogleStorageObjectSource >>>> =
+    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectSource, GoogleStorageObjectSource>>>> =
         Mutex::new(HashMap::new());
 }
 
