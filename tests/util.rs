@@ -75,17 +75,6 @@ where
     in_paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
 
     for in_path in in_paths {
-        if in_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .split('.')
-            .collect::<Vec<_>>()[0]
-            == "4032"
-        {
-            println!("4032");
-        }
         println!("Testing {}", in_path.file_name().unwrap().to_str().unwrap());
         let mut in_file = File::open(in_path).unwrap();
 
