@@ -75,8 +75,7 @@ pub fn clear_sessions() {
 
 // TODO: Make a local-only variant of Session
 pub struct Session<L: ObjectSource, R: ObjectSource> {
-    // pub local: CachedObjectSource<L>,
-    pub local: L,
+    pub local: CachedObjectSource<L>,
     pub remote: Option<CachedObjectSource<R>>,
     temp_files: HashMap<ObjectId, PathBuf>,
 }
@@ -84,8 +83,7 @@ pub struct Session<L: ObjectSource, R: ObjectSource> {
 impl<L: ObjectSource, R: ObjectSource> Session<L, R> {
     pub fn new(accessor: L, remote: Option<R>) -> Result<Self> {
         Ok(Session {
-            // local: CachedObjectSource::new(accessor),
-            local: accessor,
+            local: CachedObjectSource::new(accessor),
             remote: if let Some(remote) = remote {
                 Some(CachedObjectSource::new(remote))
             } else {
