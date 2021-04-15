@@ -1,6 +1,6 @@
 use crate::object::{
-    CachedObjectSource, FsObjectAccessor, GoogleStorageObjectAccessor, Key, ObjectId, ObjectSource,
-    RemoteAccessor, RemoteAccessorConfig,
+    CachedObjectSource, FsObjectSource, GoogleStorageObjectSource, Key, ObjectId, ObjectSource,
+    RemoteSource, RemoteSourceConfig,
 };
 use crate::util::{bytes_to_hex_str, delete_file, is_shred_available, shred_file};
 use crate::Result;
@@ -17,7 +17,7 @@ use std::{env, io};
 use uuid::Uuid;
 
 lazy_static! {
-    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectAccessor, GoogleStorageObjectAccessor>>>> =
+    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectSource, GoogleStorageObjectSource >>>> =
         Mutex::new(HashMap::new());
 }
 
@@ -26,31 +26,31 @@ type SessionMutexGuard<'a> = OwningRef<
         'a,
         HashMap<
             UuidBytes,
-            RefCell<Session<FsObjectAccessor, GoogleStorageObjectAccessor>>,
+            RefCell<Session<FsObjectSource, GoogleStorageObjectSource>>,
             RandomState,
         >,
     >,
-    RefCell<Session<FsObjectAccessor, GoogleStorageObjectAccessor>>,
+    RefCell<Session<FsObjectSource, GoogleStorageObjectSource>>,
 >;
 
 // TODO: Modularize this so remote backends can be swapped out (a factory enum might do just fine)
 pub fn new_session(
     local_path: &str,
     key: &Key,
-    remote_config: Option<RemoteAccessorConfig>,
+    remote_config: Option<RemoteSourceConfig>,
 ) -> Result<UuidBytes> {
     let uuid = *Uuid::new_v4().as_bytes();
     // TODO: Figure out how to just handle results inside of maps
     let mut remote_accessor = None;
     if let Some(c) = remote_config {
-        let accessor_wrapper = RemoteAccessor::initialize(c, key)?;
+        let accessor_wrapper = RemoteSource::initialize(c, key)?;
         remote_accessor = Some(match accessor_wrapper {
-            RemoteAccessor::GoogleStorage(accessor) => accessor,
+            RemoteSource::GoogleStorage(accessor) => accessor,
         })
     };
 
     let new_session = Session::new(
-        FsObjectAccessor::open(PathBuf::from(local_path).as_path(), key)?,
+        FsObjectSource::open(PathBuf::from(local_path).as_path(), key)?,
         remote_accessor,
     )?;
     SESSIONS

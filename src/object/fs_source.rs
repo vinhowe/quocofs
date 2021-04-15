@@ -26,7 +26,7 @@ impl FsObjectSource {
     pub fn open(path: &Path, key: &Key) -> Result<Self> {
         Self::check_no_lock(path)?;
 
-        let accessor = FsObjectSource {
+        let source = FsObjectSource {
             path: path.into(),
             names: FsObjectSource::load_reference_format(Names::new(), path, key)?,
             hashes: FsObjectSource::load_reference_format(Hashes::new(), path, key)?,
@@ -37,7 +37,7 @@ impl FsObjectSource {
         // Only acquire lock after decryption works
         Self::touch_lock(path)?;
 
-        Ok(accessor)
+        Ok(source)
     }
 
     pub fn unlock(&mut self) -> Result<()> {

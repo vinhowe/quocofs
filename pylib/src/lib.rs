@@ -4,7 +4,7 @@ use pyo3::types::{PyBytes, PyType};
 use pyo3::{create_exception, PyContextProtocol};
 use quocofs::error::QuocoError;
 use quocofs::object::{
-    Finish, Key, ObjectId, ObjectSource, QuocoReader, QuocoWriter, RemoteAccessorConfig,
+    Finish, Key, ObjectId, ObjectSource, QuocoReader, QuocoWriter, RemoteSourceConfig,
     CHUNK_LENGTH, HASH_LENGTH, KEY_LENGTH, MAX_DATA_LENGTH, MAX_NAME_LENGTH, SALT_LENGTH,
     UUID_LENGTH,
 };
@@ -61,7 +61,7 @@ impl From<QuocoError> for PyQuocoError {
 }
 
 trait PyRemoteAccessConfigProvider {
-    fn create(self) -> RemoteAccessorConfig;
+    fn create(self) -> RemoteSourceConfig;
 }
 
 #[pyclass]
@@ -83,8 +83,8 @@ impl GoogleStorageAccessorConfig {
 }
 
 impl PyRemoteAccessConfigProvider for GoogleStorageAccessorConfig {
-    fn create(self) -> RemoteAccessorConfig {
-        RemoteAccessorConfig::GoogleStorage {
+    fn create(self) -> RemoteSourceConfig {
+        RemoteSourceConfig::GoogleStorage {
             bucket: self.bucket,
             config_path: PathBuf::from(self.config_path),
         }

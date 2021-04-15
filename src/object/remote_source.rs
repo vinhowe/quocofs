@@ -2,21 +2,21 @@ use crate::object::{GoogleStorageObjectSource, Key};
 use crate::Result;
 use std::path::PathBuf;
 
-pub enum RemoteAccessorConfig {
+pub enum RemoteSourceConfig {
     GoogleStorage {
         bucket: String,
         config_path: PathBuf,
     },
 }
 
-pub enum RemoteAccessor {
+pub enum RemoteSource {
     GoogleStorage(GoogleStorageObjectSource),
 }
 
-impl RemoteAccessor {
-    pub fn initialize(config: RemoteAccessorConfig, key: &Key) -> Result<Self> {
+impl RemoteSource {
+    pub fn initialize(config: RemoteSourceConfig, key: &Key) -> Result<Self> {
         Ok(match config {
-            RemoteAccessorConfig::GoogleStorage {
+            RemoteSourceConfig::GoogleStorage {
                 bucket,
                 config_path,
             } => Self::GoogleStorage(GoogleStorageObjectSource::open(

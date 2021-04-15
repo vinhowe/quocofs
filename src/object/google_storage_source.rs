@@ -1,7 +1,7 @@
 use crate::error::QuocoError;
 use crate::error::QuocoError::{NoObjectWithName, ObjectDoesNotExist};
 use crate::formats::{Hashes, Names, ReferenceFormat};
-use crate::object::fs_accessor::LOCK_FILE_NAME;
+use crate::object::fs_source::LOCK_FILE_NAME;
 use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::bytes_to_hex_str;
 use crate::Result;
@@ -29,7 +29,7 @@ impl GoogleStorageObjectSource {
         Self::check_no_lock(bucket)?;
         Self::touch_lock(bucket)?;
 
-        let mut accessor = GoogleStorageObjectSource {
+        let mut source = GoogleStorageObjectSource {
             names: Names::default(),
             hashes: Hashes::default(),
             bucket: bucket.into(),
@@ -37,9 +37,9 @@ impl GoogleStorageObjectSource {
             lock: true,
         };
 
-        Self::load_reference_formats(&mut accessor)?;
+        Self::load_reference_formats(&mut source)?;
 
-        Ok(accessor)
+        Ok(source)
     }
 
     // pub async fn storage_hub(config_path: &Path) -> Result<Storage> {

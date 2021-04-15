@@ -18,9 +18,9 @@ pub struct CachedObjectSource<D: ObjectSource> {
 }
 
 impl<D: ObjectSource> CachedObjectSource<D> {
-    pub fn new(accessor: D) -> Self {
+    pub fn new(source: D) -> Self {
         CachedObjectSource {
-            inner: accessor,
+            inner: source,
             cache: HashMap::new(),
             insertion_order: VecDeque::new(),
             size: 0,
@@ -115,7 +115,7 @@ impl<D: ObjectSource> ObjectSource for CachedObjectSource<D> {
     }
 
     fn object_exists(&self, id: &ObjectId) -> Result<bool> {
-        // Checks if key exists in cache first because inner accessor might have to check the
+        // Checks if key exists in cache first because inner source might have to check the
         //  filesystem. Maybe it would be a good idea to store a cached list of all object IDs,
         //  but I doubt it would provide any noticeable performance boost ever.
         Ok(self.cache.contains_key(id) || self.inner.object_exists(id)?)
@@ -142,7 +142,7 @@ impl<D: ObjectSource> ObjectSource for CachedObjectSource<D> {
     }
 
     fn object_hash(&self, id: &[u8; 16]) -> Result<&ObjectHash> {
-        // Hashes and Names on FsObjectAccessor act as caches
+        // Hashes and Names on inner source act as caches
         self.inner.object_hash(id)
     }
 

@@ -3,26 +3,26 @@ use libsodium_sys::{
     crypto_secretstream_xchacha20poly1305_ABYTES,
 };
 
-pub use crate::object::cached_accessor::CachedObjectSource;
+pub use crate::object::cached_source::CachedObjectSource;
 pub use crate::object::decrypt_reader::DecryptReader;
 pub use crate::object::encrypt_writer::EncrypterWriter;
 pub use crate::object::finish::Finish;
-pub use crate::object::fs_accessor::FsObjectAccessor;
-pub use crate::object::google_storage_accessor::GoogleStorageObjectAccessor;
+pub use crate::object::fs_source::FsObjectSource;
+pub use crate::object::google_storage_source::GoogleStorageObjectSource;
 pub use crate::object::quoco_reader::QuocoReader;
 pub use crate::object::quoco_writer::QuocoWriter;
-pub use crate::object::remote_accessor::{RemoteAccessor, RemoteAccessorConfig};
+pub use crate::object::remote_source::{RemoteSource, RemoteSourceConfig};
 pub use crate::object::source::ObjectSource;
 
-mod cached_accessor;
+mod cached_source;
 mod decrypt_reader;
 mod encrypt_writer;
 mod finish;
-mod fs_accessor;
-mod google_storage_accessor;
+mod fs_source;
+mod google_storage_source;
 mod quoco_reader;
 mod quoco_writer;
-mod remote_accessor;
+mod remote_source;
 mod source;
 
 pub const CHUNK_LENGTH: usize = 4096;
