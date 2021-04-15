@@ -41,7 +41,6 @@ impl FsObjectAccessor {
     }
 
     pub fn unlock(&mut self) -> Result<()> {
-        println!("UNLOCKED");
         fs::remove_file(self.path.join(LOCK_FILE_NAME))?;
         self.lock = false;
         Ok(())
@@ -62,13 +61,11 @@ impl FsObjectAccessor {
             .truncate(true)
             .open(self.path.join(Path::new(&bytes_to_hex_str(id))))?;
         let mut writer = QuocoWriter::new(object_file, &self.key);
-        println!("WRITING");
         io::copy(reader, &mut writer)
             .expect("Error when attempting to modify object on filesystem.");
         writer
             .finish()
             .expect("Couldn't finish writing to object on filesystem.");
-        println!("WROTE");
         Ok(())
     }
 

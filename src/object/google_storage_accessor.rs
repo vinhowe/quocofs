@@ -28,7 +28,6 @@ impl GoogleStorageObjectAccessor {
 
         Self::check_no_lock(bucket)?;
         Self::touch_lock(bucket)?;
-        println!("TEST");
 
         let mut accessor = GoogleStorageObjectAccessor {
             names: Names::default(),
