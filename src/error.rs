@@ -1,6 +1,8 @@
-use crate::object::{MAX_DATA_LENGTH, MAX_NAME_LENGTH};
 use crate::formats::ReferenceFormatSpecification;
+use crate::object::{ObjectId, MAX_DATA_LENGTH, MAX_NAME_LENGTH};
+use crate::util::bytes_to_hex_str;
 use std::borrow::Borrow;
+use std::string::String;
 
 #[derive(Debug)]
 pub enum EncryptionErrorType {
@@ -29,24 +31,30 @@ pub enum QuocoError {
     SessionPathLocked(String),
     SessionDisposed,
     UndeterminedError,
+    ObjectDoesNotExist(ObjectId),
+    NoObjectWithName(String),
+    GoogleStorageError(cloud_storage::Error),
     /// Any otherwise unhandled `std::io::Error`.
-    IOError(std::io::Error),
+    IoError(std::io::Error),
 }
 
 impl std::error::Error for QuocoError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match *self {
-            QuocoError::EncryptionError(_) => None,
-            QuocoError::DecryptionError(_) => None,
-            QuocoError::EmptyInput => None,
-            QuocoError::InvalidMagicBytes(_) => None,
-            QuocoError::EncryptionInputTooLong(_) => None,
-            QuocoError::NameTooLong(_) => None,
-            QuocoError::KeyGenerationError => None,
-            QuocoError::SessionPathLocked(_) => None,
-            QuocoError::SessionDisposed => None,
-            QuocoError::UndeterminedError => None,
-            QuocoError::IOError(_) => None,
+        match self {
+            QuocoError::EncryptionError(_)
+            | QuocoError::DecryptionError(_)
+            | QuocoError::EmptyInput
+            | QuocoError::InvalidMagicBytes(_)
+            | QuocoError::EncryptionInputTooLong(_)
+            | QuocoError::NameTooLong(_)
+            | QuocoError::KeyGenerationError
+            | QuocoError::SessionPathLocked(_)
+            | QuocoError::ObjectDoesNotExist(_)
+            | QuocoError::NoObjectWithName(_)
+            | QuocoError::SessionDisposed
+            | QuocoError::UndeterminedError => None,
+            QuocoError::GoogleStorageError(ref err) => err.source(),
+            QuocoError::IoError(ref err) => err.source(),
         }
     }
 }
@@ -63,13 +71,14 @@ impl From<std::io::Error> for QuocoError {
         if err.get_ref().is_some() && (*err.get_ref().unwrap()).is::<QuocoError>() {
             return *err.into_inner().unwrap().downcast::<QuocoError>().unwrap();
         }
-        // if err_inner.is_some() {
-        //     let err_ref = err.into_inner().unwrap();
-        //     if err_ref.is::<QuocoError>() {
-        //         return err_ref;
-        //     }
-        // }
-        QuocoError::IOError(err)
+
+        QuocoError::IoError(err)
+    }
+}
+
+impl From<cloud_storage::Error> for QuocoError {
+    fn from(err: cloud_storage::Error) -> Self {
+        QuocoError::GoogleStorageError(err)
     }
 }
 
@@ -89,11 +98,14 @@ impl From<QuocoError> for std::io::Error {
             | QuocoError::NameTooLong(_)
             | QuocoError::EncryptionInputTooLong(_) => std::io::ErrorKind::InvalidData,
             QuocoError::SessionPathLocked(_) => std::io::ErrorKind::AlreadyExists,
-            QuocoError::SessionDisposed => std::io::ErrorKind::BrokenPipe,
-            QuocoError::KeyGenerationError | QuocoError::UndeterminedError => {
-                std::io::ErrorKind::Other
+            QuocoError::ObjectDoesNotExist(_) | QuocoError::NoObjectWithName(_) => {
+                std::io::ErrorKind::NotFound
             }
-            QuocoError::IOError(err) => return err.kind().into(),
+            QuocoError::SessionDisposed => std::io::ErrorKind::BrokenPipe,
+            QuocoError::KeyGenerationError
+            | QuocoError::UndeterminedError
+            | QuocoError::GoogleStorageError(_) => std::io::ErrorKind::Other,
+            QuocoError::IoError(err) => return err.kind().into(),
         };
 
         std::io::Error::new(kind, err)
@@ -142,10 +154,17 @@ impl std::fmt::Display for QuocoError {
             QuocoError::InvalidMagicBytes(data_type) => {
                 write!(f, "Invalid magic bytes for {} data.", data_type)
             }
+            QuocoError::ObjectDoesNotExist(id) => {
+                write!(f, "Object with ID {} not found.", bytes_to_hex_str(id))
+            }
+            QuocoError::NoObjectWithName(name) => {
+                write!(f, "No object found with name \"{}\".", name)
+            }
             QuocoError::UndeterminedError => {
                 write!(f, "Undetermined error.")
             }
-            QuocoError::IOError(ref err) => err.fmt(f),
+            QuocoError::GoogleStorageError(ref err) => err.fmt(f),
+            QuocoError::IoError(ref err) => err.fmt(f),
         }
     }
 }

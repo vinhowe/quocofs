@@ -1,18 +1,19 @@
+use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
 use pyo3::{create_exception, PyContextProtocol};
-use pyo3::{exceptions, PyClass};
-use quocofs::object::{
-    ObjectSource, ObjectId, Key, QuocoReader, QuocoWriter, CHUNK_LENGTH, HASH_LENGTH,
-    KEY_LENGTH, MAX_DATA_LENGTH, MAX_NAME_LENGTH, SALT_LENGTH, UUID_LENGTH,
-};
 use quocofs::error::QuocoError;
-use quocofs::object::finish::Finish;
+use quocofs::object::{
+    Finish, Key, ObjectId, ObjectSource, QuocoReader, QuocoWriter, RemoteAccessorConfig,
+    CHUNK_LENGTH, HASH_LENGTH, KEY_LENGTH, MAX_DATA_LENGTH, MAX_NAME_LENGTH, SALT_LENGTH,
+    UUID_LENGTH,
+};
 use quocofs::session::{close_session, get_session, new_session};
 use quocofs::util::{generate_key, sha256};
 use quocofs::*;
 use std::io;
 use std::io::{Cursor, Read};
+use std::path::PathBuf;
 
 create_exception!(module, EncryptionError, exceptions::PyException);
 create_exception!(module, DecryptionError, exceptions::PyException);
@@ -24,13 +25,16 @@ create_exception!(module, EncryptionInputTooLong, exceptions::PyException);
 create_exception!(module, UndeterminedError, exceptions::PyException);
 create_exception!(module, SessionDisposed, exceptions::PyException);
 create_exception!(module, SessionPathLocked, exceptions::PyException);
+create_exception!(module, ObjectDoesNotExist, exceptions::PyException);
+create_exception!(module, NoObjectWithName, exceptions::PyException);
+create_exception!(module, GoogleStorageError, exceptions::PyException);
 
 struct PyQuocoError(QuocoError);
 
 impl From<PyQuocoError> for PyErr {
     fn from(err: PyQuocoError) -> PyErr {
         match err.0 {
-            QuocoError::IOError(io_err) => exceptions::PyOSError::new_err(io_err.to_string()),
+            QuocoError::IoError(io_err) => exceptions::PyOSError::new_err(io_err.to_string()),
             QuocoError::EncryptionError(_) => EncryptionError::new_err(err.0.to_string()),
             QuocoError::DecryptionError(_) => DecryptionError::new_err(err.0.to_string()),
             QuocoError::EmptyInput => EmptyInput::new_err(err.0.to_string()),
@@ -43,6 +47,9 @@ impl From<PyQuocoError> for PyErr {
             QuocoError::UndeterminedError => UndeterminedError::new_err(err.0.to_string()),
             QuocoError::SessionDisposed => SessionDisposed::new_err(err.0.to_string()),
             QuocoError::SessionPathLocked(_) => SessionPathLocked::new_err(err.0.to_string()),
+            QuocoError::ObjectDoesNotExist(_) => ObjectDoesNotExist::new_err(err.0.to_string()),
+            QuocoError::NoObjectWithName(_) => NoObjectWithName::new_err(err.0.to_string()),
+            QuocoError::GoogleStorageError(_) => GoogleStorageError::new_err(err.0.to_string()),
         }
     }
 }
@@ -50,6 +57,37 @@ impl From<PyQuocoError> for PyErr {
 impl From<QuocoError> for PyQuocoError {
     fn from(err: QuocoError) -> PyQuocoError {
         PyQuocoError(err)
+    }
+}
+
+trait PyRemoteAccessConfigProvider {
+    fn create(self) -> RemoteAccessorConfig;
+}
+
+#[pyclass]
+#[derive(Clone)]
+struct GoogleStorageAccessorConfig {
+    bucket: String,
+    config_path: String,
+}
+
+#[pymethods]
+impl GoogleStorageAccessorConfig {
+    #[new]
+    fn new(bucket: String, config_path: String) -> Self {
+        GoogleStorageAccessorConfig {
+            bucket,
+            config_path,
+        }
+    }
+}
+
+impl PyRemoteAccessConfigProvider for GoogleStorageAccessorConfig {
+    fn create(self) -> RemoteAccessorConfig {
+        RemoteAccessorConfig::GoogleStorage {
+            bucket: self.bucket,
+            config_path: PathBuf::from(self.config_path),
+        }
     }
 }
 
@@ -61,70 +99,106 @@ struct PySession {
 #[pymethods]
 impl PySession {
     #[new]
-    fn new(path: &str, key: Key) -> Self {
-        PySession {
-            id: new_session(path, &key).unwrap(),
-        }
+    fn new(path: &str, key: Key, remote_config: Option<&PyAny>) -> PyResult<Self> {
+        Ok(PySession {
+            id: new_session(
+                path,
+                &key,
+                remote_config
+                    .map(|c| c.extract().expect("Couldn't extract remote config type"))
+                    .map(|c| match c {
+                        GoogleStorageAccessorConfig { .. } => c.create(),
+                    }),
+            )
+            .map_err(PyQuocoError)?,
+        })
+    }
+
+    fn object<'p>(&self, py: Python<'p>, id: ObjectId) -> PyResult<&'p PyBytes> {
+        let mut object_data = Vec::new();
+        let mut object_reader = get_session(&self.id)
+            .borrow_mut()
+            .local
+            .object(&id)
+            .map_err(PyQuocoError)?;
+        object_reader.read_to_end(&mut object_data)?;
+
+        Ok(PyBytes::new(py, &object_data))
     }
 
     fn create_object<'p>(&self, py: Python<'p>, data: Vec<u8>) -> PyResult<&'p PyBytes> {
-        // TODO: Holy... figure out how to pull this out into its own function
         let object_id = get_session(&self.id)
             .borrow_mut()
-            .cache
+            .local
             .create_object(&mut Cursor::new(data))
-            // TODO: This error handling is awful and I hate it
-            .expect("Couldn't create a object!");
+            .map_err(PyQuocoError)?;
+
         Ok(PyBytes::new(py, &object_id))
     }
 
-    fn modify_object(&self, id: ObjectId, data: Vec<u8>) -> PyResult<bool> {
+    fn modify_object(&self, id: ObjectId, data: Vec<u8>) -> PyResult<()> {
+        get_session(&self.id)
+            .borrow_mut()
+            .local
+            .modify_object(&id, &mut Cursor::new(data))
+            .map_err(PyQuocoError)?;
+
+        Ok(())
+    }
+
+    fn delete_object(&self, id: ObjectId) -> PyResult<()> {
+        get_session(&self.id)
+            .borrow_mut()
+            .local
+            .delete_object(&id)
+            .map_err(PyQuocoError)?;
+
+        Ok(())
+    }
+
+    fn object_id_with_name(&self, name: &str) -> PyResult<ObjectId> {
+        Ok(*get_session(&self.id)
+            .borrow()
+            .local
+            .object_id_with_name(name)
+            .map_err(PyQuocoError)?)
+    }
+
+    fn set_object_name(&self, id: ObjectId, name: &str) -> PyResult<()> {
+        get_session(&self.id)
+            .borrow_mut()
+            .local
+            .set_object_name(&id, name)
+            .map_err(PyQuocoError)?;
+
+        Ok(())
+    }
+
+    fn flush(&self) -> PyResult<()> {
         Ok(get_session(&self.id)
             .borrow_mut()
-            .cache
-            .modify_object(&id, &mut Cursor::new(data)))
-    }
-
-    fn delete_object(&self, id: ObjectId) -> bool {
-        get_session(&self.id)
-            .borrow_mut()
-            .cache
-            .delete_object(&id)
-    }
-
-    fn object_id_with_name(&self, name: &str) -> Option<ObjectId> {
-        get_session(&self.id)
-            .borrow()
-            .cache
-            .object_id_with_name(name)
-            .copied()
-    }
-
-    fn set_object_name(&self, id: ObjectId, name: &str) -> bool {
-        get_session(&self.id)
-            .borrow_mut()
-            .cache
-            .set_object_name(&id, name)
-    }
-
-    fn flush(&self) -> bool {
-        get_session(&self.id).borrow_mut().cache.flush()
+            .local
+            .flush()
+            .map_err(PyQuocoError)?)
     }
 
     fn object_temp_file(&self, id: ObjectId) -> PyResult<String> {
-        get_session(&self.id)
+        let path = get_session(&self.id)
             .borrow_mut()
             .object_temp_file(&id)
             .map(|path| path.to_str().unwrap().to_string())
-            .map_err(|err| PyQuocoError(err).into())
-        // TODO: This error handling is awful and I hate it
+            .map_err(PyQuocoError)?;
+
+        Ok(path)
     }
 
     fn clear_temp_files(&self) -> PyResult<()> {
         get_session(&self.id)
             .borrow_mut()
             .clear_temp_files()
-            .map_err(|err| PyQuocoError(err).into())
+            .map_err(PyQuocoError)?;
+
+        Ok(())
     }
 }
 
@@ -167,9 +241,13 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     _m.add("Undetermined", _py.get_type::<UndeterminedError>())?;
     _m.add("SessionDisposed", _py.get_type::<SessionDisposed>())?;
     _m.add("SessionPathLocked", _py.get_type::<SessionPathLocked>())?;
+    _m.add("ObjectDoesNotExist", _py.get_type::<ObjectDoesNotExist>())?;
+    _m.add("NoObjectWithName", _py.get_type::<NoObjectWithName>())?;
+    _m.add("GoogleStorageError", _py.get_type::<GoogleStorageError>())?;
 
     // Classes
     _m.add_class::<PySession>()?;
+    _m.add_class::<GoogleStorageAccessorConfig>()?;
 
     #[pyfn(_m, "dumps")]
     fn dumps_py(py: Python, data: Vec<u8>, key: [u8; KEY_LENGTH]) -> PyResult<&PyBytes> {
@@ -194,7 +272,7 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     fn key_py(py: Python, password: String, salt: [u8; SALT_LENGTH]) -> PyResult<&PyBytes> {
         Ok(PyBytes::new(
             py,
-            &generate_key(password.as_str(), &salt).map_err(PyQuocoError)?,
+            &generate_key(&password, &salt).map_err(PyQuocoError)?,
         ))
     }
 

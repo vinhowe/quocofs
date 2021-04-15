@@ -1,6 +1,6 @@
-use crate::object::{CHUNK_LENGTH, SALT_LENGTH};
-use crate::error::QuocoError;
+use crate::Result;
 use crate::error::QuocoError::{KeyGenerationError, UndeterminedError};
+use crate::object::{CHUNK_LENGTH, SALT_LENGTH};
 use libsodium_sys::{
     crypto_box_SEEDBYTES, crypto_hash_sha256_final, crypto_hash_sha256_init,
     crypto_hash_sha256_state, crypto_hash_sha256_update, crypto_pwhash, crypto_pwhash_ALG_DEFAULT,
@@ -15,7 +15,7 @@ use std::process::Command;
 pub fn generate_key<'a>(
     password: &'a str,
     salt: &'a [u8; SALT_LENGTH],
-) -> Result<[u8; crypto_box_SEEDBYTES as usize], QuocoError> {
+) -> Result<[u8; crypto_box_SEEDBYTES as usize]> {
     let mut key = [0u8; crypto_box_SEEDBYTES as usize];
     unsafe {
         if crypto_pwhash(
@@ -36,7 +36,7 @@ pub fn generate_key<'a>(
     Ok(key)
 }
 
-pub fn sha256<R: Read>(reader: &mut R, hash: *mut u8) -> Result<(), QuocoError> {
+pub fn sha256<R: Read>(reader: &mut R, hash: *mut u8) -> Result<()> {
     let mut state = MaybeUninit::<crypto_hash_sha256_state>::uninit();
     unsafe {
         if crypto_hash_sha256_init(state.as_mut_ptr()) != 0 {
@@ -103,4 +103,12 @@ pub fn shred_file(path: &Path) -> bool {
 
 pub fn delete_file(path: &Path) -> bool {
     fs::remove_file(path).is_ok()
+}
+
+pub fn bytes_to_hex_str(bytes: &[u8]) -> String {
+    hex::encode(bytes)
+}
+
+pub fn hex_str_to_bytes(hex: &str) -> Vec<u8> {
+    hex::decode(hex).expect("Couldn't decode byte string")
 }

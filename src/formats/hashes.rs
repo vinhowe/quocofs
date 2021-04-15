@@ -1,5 +1,5 @@
+use crate::Result;
 use crate::object::{ObjectHash, ObjectId, HASH_LENGTH, UUID_LENGTH};
-use crate::error::QuocoError;
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, HASHES};
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -41,7 +41,7 @@ impl ReferenceFormat for Hashes {
         &HASHES
     }
 
-    fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<(), QuocoError> {
+    fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<()> {
         Self::check_magic_bytes(reader)?;
 
         let mut timestamp = [0u8; size_of::<u64>()];
@@ -65,7 +65,7 @@ impl ReferenceFormat for Hashes {
         Ok(())
     }
 
-    fn save<W: Write>(&self, writer: &mut W) -> Result<(), QuocoError> {
+    fn save<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(Self::specification().magic_bytes)?;
         let now: u64 = SystemTime::now()
             .duration_since(UNIX_EPOCH)

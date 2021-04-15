@@ -1,7 +1,8 @@
-use crate::object::{ObjectSource, ObjectHash, ObjectId};
+use crate::object::{ObjectHash, ObjectId, ObjectSource};
+use crate::Result;
 use std::collections::{HashMap, VecDeque};
 use std::io;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::ops::Index;
 use std::str;
 
@@ -43,9 +44,10 @@ impl<D: ObjectSource> CachedObjectSource<D> {
         };
         self.size -= entry.len();
         self.insertion_order.remove(
-            self.insertion_order.iter().position(|x| *x == *id).expect(
-                "Found object ID in cache, but couldn't find it in insertion order list.",
-            ),
+            self.insertion_order
+                .iter()
+                .position(|x| *x == *id)
+                .expect("Found object ID in cache, but couldn't find it in insertion order list."),
         );
 
         Some(entry)
@@ -72,14 +74,11 @@ impl<D: ObjectSource> CachedObjectSource<D> {
         Ok(self.insert(id, data))
     }
 
-    fn load_into_cache(&mut self, id: &ObjectId) -> bool {
-        if let Some(mut reader) = self.inner.object(id) {
-            self.insert_reader(id, &mut reader)
-                .expect("Error when attempting to read into object cache.");
-            return true;
-        }
+    fn load_into_cache(&mut self, id: &ObjectId) -> Result<()> {
+        let mut object_reader = self.inner.object(id)?;
+        self.insert_reader(id, &mut object_reader)?;
 
-        false
+        Ok(())
     }
 
     /// Removes object entries until either the total cache size is under [`MAX_CACHE_SIZE`] or
@@ -106,69 +105,56 @@ impl<D: ObjectSource> Index<&ObjectId> for CachedObjectSource<D> {
 impl<D: ObjectSource> ObjectSource for CachedObjectSource<D> {
     type OutReader = Cursor<Vec<u8>>;
 
-    fn object(&mut self, id: &ObjectId) -> Option<Cursor<Vec<u8>>> {
-        if !self.object_exists(id) {
-            return None;
-        }
-
-        if !self.cache.contains_key(id) && !self.load_into_cache(id) {
-            return None;
+    fn object(&mut self, id: &ObjectId) -> Result<Self::OutReader> {
+        if !self.cache.contains_key(id) {
+            self.load_into_cache(id)?;
         }
 
         // TODO: See if this irresponsibly fills memory
-        Some(Cursor::new(self.cache[id].clone()))
+        Ok(Cursor::new(self.cache[id].clone()))
     }
 
-    fn object_exists(&self, id: &ObjectId) -> bool {
+    fn object_exists(&self, id: &ObjectId) -> Result<bool> {
         // Checks if key exists in cache first because inner accessor might have to check the
         //  filesystem. Maybe it would be a good idea to store a cached list of all object IDs,
         //  but I doubt it would provide any noticeable performance boost ever.
-        self.cache.contains_key(id) || self.inner.object_exists(id)
+        Ok(self.cache.contains_key(id) || self.inner.object_exists(id)?)
     }
 
-    fn delete_object(&mut self, id: &ObjectId) -> bool {
+    fn delete_object(&mut self, id: &ObjectId) -> Result<()> {
         self.remove(id);
         self.inner.delete_object(id)
     }
 
-    fn create_object<R: Read>(&mut self, reader: &mut R) -> Option<ObjectId> {
-        if let Some(id) = self.inner.create_object(reader) {
-            if self.insert_reader(&id, reader).is_err() {
-                // TODO: Panic seems appropriate here because this should never ever happen,
-                //  but the way the UUID is generated is ultimately up to the underlying
-                //  ObjectAccessor implementor. This is either defensive or paranoid.
-                panic!("Created a new object with an existing name");
-            }
-            return Some(id);
-        }
+    fn create_object<R: Read + Seek>(&mut self, reader: &mut R) -> Result<ObjectId> {
+        let id = self.inner.create_object(reader)?;
+        self.insert_reader(&id, reader)?;
 
-        None
+        Ok(id)
     }
 
-    fn modify_object<R: Read>(&mut self, id: &ObjectId, reader: &mut R) -> bool {
-        if !self.object_exists(id) {
-            return false;
-        }
+    fn modify_object<R: Read + Seek>(&mut self, id: &ObjectId, reader: &mut R) -> Result<()> {
+        self.inner.modify_object(id, reader)?;
+        reader.seek(SeekFrom::Start(0))?;
+        self.insert_reader(id, reader)?;
 
-        self.insert_reader(id, reader)
-            .expect("Error when reading into object cache.");
-        true
+        Ok(())
     }
 
-    fn object_hash(&self, id: &[u8; 16]) -> Option<&ObjectHash> {
+    fn object_hash(&self, id: &[u8; 16]) -> Result<&ObjectHash> {
         // Hashes and Names on FsObjectAccessor act as caches
         self.inner.object_hash(id)
     }
 
-    fn object_id_with_name(&self, name: &str) -> Option<&ObjectId> {
+    fn object_id_with_name(&self, name: &str) -> Result<&ObjectId> {
         self.inner.object_id_with_name(name)
     }
 
-    fn set_object_name(&mut self, id: &ObjectId, name: &str) -> bool {
+    fn set_object_name(&mut self, id: &ObjectId, name: &str) -> Result<()> {
         self.inner.set_object_name(id, name)
     }
 
-    fn flush(&mut self) -> bool {
+    fn flush(&mut self) -> Result<()> {
         self.inner.flush()
     }
 }

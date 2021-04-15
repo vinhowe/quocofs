@@ -1,36 +1,58 @@
 use crate::object::{
-    CachedObjectSource, ObjectSource, ObjectId, FsObjectAccessor, Key,
+    CachedObjectSource, FsObjectAccessor, GoogleStorageObjectAccessor, Key, ObjectId, ObjectSource,
+    RemoteAccessor, RemoteAccessorConfig,
 };
-use crate::error::QuocoError;
-use crate::util::{delete_file, is_shred_available, shred_file};
+use crate::util::{bytes_to_hex_str, delete_file, is_shred_available, shred_file};
+use crate::Result;
 use crate::UuidBytes;
 use lazy_static::lazy_static;
 use owning_ref::{MutexGuardRef, OwningRef};
 use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
-use std::io;
-use std::path::PathBuf;
+use std::fs::File;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
-use tempfile::NamedTempFile;
+use std::{env, io};
 use uuid::Uuid;
 
 lazy_static! {
-    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectAccessor >>>> =
+    pub static ref SESSIONS: Mutex<HashMap<UuidBytes, RefCell<Session<FsObjectAccessor, GoogleStorageObjectAccessor>>>> =
         Mutex::new(HashMap::new());
 }
 
 type SessionMutexGuard<'a> = OwningRef<
-    MutexGuard<'a, HashMap<UuidBytes, RefCell<Session<FsObjectAccessor>>, RandomState>>,
-    RefCell<Session<FsObjectAccessor>>,
+    MutexGuard<
+        'a,
+        HashMap<
+            UuidBytes,
+            RefCell<Session<FsObjectAccessor, GoogleStorageObjectAccessor>>,
+            RandomState,
+        >,
+    >,
+    RefCell<Session<FsObjectAccessor, GoogleStorageObjectAccessor>>,
 >;
 
-pub fn new_session(path: &str, key: &Key) -> Result<UuidBytes, QuocoError> {
+// TODO: Modularize this so remote backends can be swapped out (a factory enum might do just fine)
+pub fn new_session(
+    local_path: &str,
+    key: &Key,
+    remote_config: Option<RemoteAccessorConfig>,
+) -> Result<UuidBytes> {
     let uuid = *Uuid::new_v4().as_bytes();
-    let new_session = Session::new(FsObjectAccessor::open(
-        PathBuf::from(path).as_path(),
-        key,
-    )?)?;
+    // TODO: Figure out how to just handle results inside of maps
+    let mut remote_accessor = None;
+    if let Some(c) = remote_config {
+        let accessor_wrapper = RemoteAccessor::initialize(c, key)?;
+        remote_accessor = Some(match accessor_wrapper {
+            RemoteAccessor::GoogleStorage(accessor) => accessor,
+        })
+    };
+
+    let new_session = Session::new(
+        FsObjectAccessor::open(PathBuf::from(local_path).as_path(), key)?,
+        remote_accessor,
+    )?;
     SESSIONS
         .lock()
         .unwrap()
@@ -51,35 +73,57 @@ pub fn clear_sessions() {
     SESSIONS.lock().unwrap().clear()
 }
 
-pub struct Session<D: ObjectSource> {
-    pub cache: CachedObjectSource<D>,
+// TODO: Make a local-only variant of Session
+pub struct Session<L: ObjectSource, R: ObjectSource> {
+    // pub local: CachedObjectSource<L>,
+    pub local: L,
+    pub remote: Option<CachedObjectSource<R>>,
     temp_files: HashMap<ObjectId, PathBuf>,
 }
 
-impl<D: ObjectSource> Session<D> {
-    pub fn new(accessor: D) -> Result<Self, QuocoError> {
+impl<L: ObjectSource, R: ObjectSource> Session<L, R> {
+    pub fn new(accessor: L, remote: Option<R>) -> Result<Self> {
         Ok(Session {
-            cache: CachedObjectSource::new(accessor),
+            // local: CachedObjectSource::new(accessor),
+            local: accessor,
+            remote: if let Some(remote) = remote {
+                Some(CachedObjectSource::new(remote))
+            } else {
+                None
+            },
             temp_files: HashMap::new(),
         })
     }
 
-    pub fn object_temp_file(&mut self, id: &ObjectId) -> Result<PathBuf, QuocoError> {
+    pub fn object_temp_file(&mut self, id: &ObjectId) -> Result<PathBuf> {
         if self.temp_files.contains_key(id) {
             return Ok(self.temp_files[id].clone());
         }
 
-        let mut temp_file = NamedTempFile::new()?;
-        io::copy(&mut self.cache.object(id).unwrap(), &mut temp_file)?;
-        Ok(temp_file.path().into())
+        let temp_file_path = env::temp_dir().join(Path::new(&bytes_to_hex_str(id)));
+        io::copy(
+            &mut self.local.object(id)?,
+            &mut File::create(temp_file_path.clone())?,
+        )?;
+        self.temp_files.insert(*id, temp_file_path.clone());
+
+        Ok(temp_file_path)
     }
 
-    pub fn clear_temp_files(&mut self) -> Result<(), QuocoError> {
+    pub fn clear_temp_files(&mut self) -> Result<()> {
         let can_shred = is_shred_available();
+        let local = &mut self.local;
         let shred_successful = self
             .temp_files
             .drain()
             .map(|f| {
+                local
+                    .modify_object(
+                        &f.0,
+                        &mut File::open(f.1.clone()).expect("Couldn't open temp file"),
+                    )
+                    .expect("Failed to modify object from temp");
+
                 if can_shred {
                     return shred_file(f.1.as_path());
                 }
@@ -93,5 +137,12 @@ impl<D: ObjectSource> Session<D> {
             );
         }
         Ok(())
+    }
+}
+
+impl<L: ObjectSource, R: ObjectSource> Drop for Session<L, R> {
+    fn drop(&mut self) {
+        // TODO: Fix error handling on this whole thing
+        self.clear_temp_files().expect("Failed to clear temp files")
     }
 }

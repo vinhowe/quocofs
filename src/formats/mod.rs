@@ -5,6 +5,7 @@ pub use crate::formats::hashes::Hashes;
 pub use crate::formats::names::Names;
 
 use crate::error::QuocoError;
+use crate::Result;
 use std::io::{BufRead, Read, Write};
 
 #[derive(Debug)]
@@ -36,13 +37,13 @@ pub trait ReferenceFormat {
     //  any solution that feels less icky than this.
     fn specification() -> &'static ReferenceFormatSpecification;
 
-    fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<(), QuocoError>;
-    fn save<W: Write>(&self, writer: &mut W) -> Result<(), QuocoError>;
+    fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<()>;
+    fn save<W: Write>(&self, writer: &mut W) -> Result<()>;
 
-    fn check_magic_bytes<R: Read>(reader: &mut R) -> Result<(), QuocoError> {
+    fn check_magic_bytes<R: Read>(reader: &mut R) -> Result<()> {
         let format_info = Self::specification();
         let mut magic_bytes = vec![0; format_info.magic_bytes.len()];
-        reader.read_exact(&mut magic_bytes).unwrap();
+        reader.read_exact(&mut magic_bytes)?;
 
         if magic_bytes.ne(format_info.magic_bytes) {
             return Err(QuocoError::InvalidMagicBytes(format_info));

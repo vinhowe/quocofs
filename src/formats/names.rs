@@ -1,5 +1,5 @@
+use crate::Result;
 use crate::object::{ObjectId, UUID_LENGTH};
-use crate::error::QuocoError;
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, NAMES};
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write};
@@ -36,7 +36,7 @@ impl ReferenceFormat for Names {
         &NAMES
     }
 
-    fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<(), QuocoError> {
+    fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<()> {
         Self::check_magic_bytes(reader)?;
         let mut uuid = [0u8; UUID_LENGTH];
 
@@ -48,7 +48,7 @@ impl ReferenceFormat for Names {
             }
 
             let mut string_buffer = Vec::new();
-            let name_bytes_read = reader.read_until(0u8, &mut string_buffer).unwrap();
+            let name_bytes_read = reader.read_until(0u8, &mut string_buffer)?;
 
             let name = String::from_utf8(string_buffer[..name_bytes_read - 1].to_vec()).unwrap();
 
@@ -57,7 +57,7 @@ impl ReferenceFormat for Names {
         Ok(())
     }
 
-    fn save<W: Write>(&self, writer: &mut W) -> Result<(), QuocoError> {
+    fn save<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(Self::specification().magic_bytes)?;
         for name in self.data.iter() {
             writer.write_all(name.0)?;

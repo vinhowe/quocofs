@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::object::{Key, CHUNK_LENGTH, ENCRYPTED_CHUNK_LENGTH};
 use crate::error::{EncryptionErrorType, QuocoError};
 use libsodium_sys::{
@@ -39,7 +40,7 @@ impl<R: Read> DecryptReader<R> {
         }
     }
 
-    fn init_crypto(&mut self) -> Result<(), QuocoError> {
+    fn init_crypto(&mut self) -> Result<()> {
         let mut state = MaybeUninit::<crypto_secretstream_xchacha20poly1305_state>::uninit();
 
         #[allow(clippy::uninit_assumed_init)]
@@ -67,7 +68,7 @@ impl<R: Read> DecryptReader<R> {
         Ok(())
     }
 
-    fn read_next_chunk(&mut self) -> Result<usize, QuocoError> {
+    fn read_next_chunk(&mut self) -> Result<usize> {
         // TODO: Once the encoder supports this, handle multiple compressed/encrypted blocks in one
         //  file with a header index.
 

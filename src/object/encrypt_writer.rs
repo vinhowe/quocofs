@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::object::finish::Finish;
 use crate::object::{Key, CHUNK_LENGTH, ENCRYPTED_CHUNK_LENGTH};
 use crate::error::{EncryptionErrorType, QuocoError};
@@ -44,7 +45,7 @@ impl<W: Write> EncrypterWriter<W> {
         }
     }
 
-    fn init_crypto(&mut self) -> Result<(), QuocoError> {
+    fn init_crypto(&mut self) -> Result<()> {
         let mut state = MaybeUninit::<crypto_secretstream_xchacha20poly1305_state>::uninit();
         let mut header = [0u8; crypto_secretstream_xchacha20poly1305_HEADERBYTES as usize];
 
@@ -65,7 +66,7 @@ impl<W: Write> EncrypterWriter<W> {
         Ok(())
     }
 
-    fn write_chunk(&mut self, tag: u8) -> Result<(), QuocoError> {
+    fn write_chunk(&mut self, tag: u8) -> Result<()> {
         if self.finished {
             return Err(QuocoError::EncryptionError(EncryptionErrorType::Other(
                 "Attempted to write chunk after final tag.",

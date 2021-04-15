@@ -26,7 +26,8 @@ impl<W: Write> QuocoWriter<W> {
 impl<W: Write> Finish<W> for QuocoWriter<W> {
     fn finish(mut self) -> io::Result<W> {
         self.inner.flush()?;
-        Ok(self.inner.into_inner().finish()?)
+        let writer = self.inner.into_inner().finish()?;
+        Ok(writer)
     }
 }
 
