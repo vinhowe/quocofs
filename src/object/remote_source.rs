@@ -1,4 +1,4 @@
-use crate::object::{GoogleStorageObjectAccessor, Key};
+use crate::object::{GoogleStorageObjectSource, Key};
 use crate::Result;
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ pub enum RemoteAccessorConfig {
 }
 
 pub enum RemoteAccessor {
-    GoogleStorage(GoogleStorageObjectAccessor),
+    GoogleStorage(GoogleStorageObjectSource),
 }
 
 impl RemoteAccessor {
@@ -19,7 +19,7 @@ impl RemoteAccessor {
             RemoteAccessorConfig::GoogleStorage {
                 bucket,
                 config_path,
-            } => Self::GoogleStorage(GoogleStorageObjectAccessor::open(
+            } => Self::GoogleStorage(GoogleStorageObjectSource::open(
                 &bucket,
                 config_path.as_path(),
                 key,

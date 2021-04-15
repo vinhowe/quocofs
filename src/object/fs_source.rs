@@ -12,7 +12,7 @@ use std::str;
 use std::{fs, io};
 use uuid::Uuid;
 
-pub struct FsObjectAccessor {
+pub struct FsObjectSource {
     names: Names,
     hashes: Hashes,
     path: PathBuf,
@@ -22,14 +22,14 @@ pub struct FsObjectAccessor {
 
 pub const LOCK_FILE_NAME: &str = "quoco.lock";
 
-impl FsObjectAccessor {
+impl FsObjectSource {
     pub fn open(path: &Path, key: &Key) -> Result<Self> {
         Self::check_no_lock(path)?;
 
-        let accessor = FsObjectAccessor {
+        let accessor = FsObjectSource {
             path: path.into(),
-            names: FsObjectAccessor::load_reference_format(Names::new(), path, key)?,
-            hashes: FsObjectAccessor::load_reference_format(Hashes::new(), path, key)?,
+            names: FsObjectSource::load_reference_format(Names::new(), path, key)?,
+            hashes: FsObjectSource::load_reference_format(Hashes::new(), path, key)?,
             key: *key,
             lock: true,
         };
@@ -110,7 +110,7 @@ impl FsObjectAccessor {
     }
 }
 
-impl ObjectSource for FsObjectAccessor {
+impl ObjectSource for FsObjectSource {
     type OutReader = QuocoReader<File>;
     fn object(&mut self, id: &ObjectId) -> Result<Self::OutReader> {
         let object_path = self.path.join(&bytes_to_hex_str(id));
@@ -181,7 +181,7 @@ impl ObjectSource for FsObjectAccessor {
     }
 }
 
-impl Drop for FsObjectAccessor {
+impl Drop for FsObjectSource {
     fn drop(&mut self) {
         self.flush().expect("Failed to flush.");
         self.unlock()

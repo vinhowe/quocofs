@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 const OBJECT_MIME_TYPE: &str = "application/octet-stream";
 
-pub struct GoogleStorageObjectAccessor {
+pub struct GoogleStorageObjectSource {
     names: Names,
     hashes: Hashes,
     bucket: String,
@@ -21,7 +21,7 @@ pub struct GoogleStorageObjectAccessor {
     lock: bool,
 }
 
-impl GoogleStorageObjectAccessor {
+impl GoogleStorageObjectSource {
     pub fn open(bucket: &str, config_path: &Path, key: &Key) -> Result<Self> {
         // Sort of a kludge
         std::env::set_var("SERVICE_ACCOUNT", config_path);
@@ -29,7 +29,7 @@ impl GoogleStorageObjectAccessor {
         Self::check_no_lock(bucket)?;
         Self::touch_lock(bucket)?;
 
-        let mut accessor = GoogleStorageObjectAccessor {
+        let mut accessor = GoogleStorageObjectSource {
             names: Names::default(),
             hashes: Hashes::default(),
             bucket: bucket.into(),
@@ -163,7 +163,7 @@ impl GoogleStorageObjectAccessor {
     }
 }
 
-impl ObjectSource for GoogleStorageObjectAccessor {
+impl ObjectSource for GoogleStorageObjectSource {
     type OutReader = QuocoReader<Cursor<Vec<u8>>>;
 
     fn object(&mut self, id: &ObjectId) -> Result<Self::OutReader> {
@@ -241,7 +241,7 @@ impl ObjectSource for GoogleStorageObjectAccessor {
     }
 }
 
-impl Drop for GoogleStorageObjectAccessor {
+impl Drop for GoogleStorageObjectSource {
     fn drop(&mut self) {
         self.flush().expect("Failed to flush.");
         self.unlock()
