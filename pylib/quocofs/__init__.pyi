@@ -46,6 +46,12 @@ class Session:
     def clear_temp_files(self) -> None:
         pass
 
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
 # This class doesn't actually exist
 class RemoteAccessorConfig(ABC):
     @abstractmethod
