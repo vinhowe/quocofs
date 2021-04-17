@@ -3,10 +3,10 @@ use crate::error::QuocoError::{NoObjectWithName, ObjectDoesNotExist};
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use crate::object::finish::Finish;
 use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
-use crate::util::bytes_to_hex_str;
+use crate::util::{bytes_to_hex_str, sha256};
 use crate::Result;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::str;
 use std::{fs, io};
@@ -54,13 +54,27 @@ impl FsObjectSource {
         Ok(())
     }
 
-    fn modify_object_unchecked<R: Read>(&mut self, id: &ObjectId, reader: &mut R) -> Result<()> {
+    fn modify_object_unchecked<R: Read + Seek>(
+        &mut self,
+        id: &ObjectId,
+        reader: &mut R,
+        update_hash: bool,
+    ) -> Result<()> {
+        // Allow skipping hash computation because it might have been done on another object source
+
         let object_file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(self.path.join(Path::new(&bytes_to_hex_str(id))))?;
         let mut writer = QuocoWriter::new(object_file, &self.key);
+
+        if update_hash {
+            // TODO: Avoid recomputing hash when modifying object on remote source by just getting it
+            //  from local hashes cache first
+            self.hashes.insert(id, &sha256(reader)?);
+            reader.seek(SeekFrom::Start(0))?;
+        }
         io::copy(reader, &mut writer)
             .expect("Error when attempting to modify object on filesystem.");
         writer
@@ -129,20 +143,20 @@ impl ObjectSource for FsObjectSource {
         Ok(())
     }
 
-    fn create_object<InR: Read>(&mut self, reader: &mut InR) -> Result<ObjectId> {
+    fn create_object<InR: Read + Seek>(&mut self, reader: &mut InR) -> Result<ObjectId> {
         self.check_lock()?;
 
         let new_id = {
             let uuid = Uuid::new_v4();
             *uuid.as_bytes()
         };
-        self.modify_object_unchecked(&new_id, reader)?;
+        self.modify_object_unchecked(&new_id, reader, true)?;
 
         Ok(new_id)
     }
 
-    fn modify_object<InR: Read>(&mut self, id: &ObjectId, reader: &mut InR) -> Result<()> {
-        self.modify_object_unchecked(id, reader)
+    fn modify_object<InR: Read + Seek>(&mut self, id: &ObjectId, reader: &mut InR) -> Result<()> {
+        self.modify_object_unchecked(id, reader, true)
     }
 
     fn object_hash(&self, id: &ObjectId) -> Result<&ObjectHash> {

@@ -1,15 +1,17 @@
+use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::path::Path;
+use std::str;
+
+use cloud_storage::{Error, Object};
+use uuid::Uuid;
+
 use crate::error::QuocoError;
 use crate::error::QuocoError::{NoObjectWithName, ObjectDoesNotExist};
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use crate::object::fs_source::LOCK_FILE_NAME;
 use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
-use crate::util::bytes_to_hex_str;
+use crate::util::{bytes_to_hex_str, sha256};
 use crate::Result;
-use cloud_storage::{Error, Object};
-use std::io::{Cursor, Read, Seek};
-use std::path::Path;
-use std::str;
-use uuid::Uuid;
 
 const OBJECT_MIME_TYPE: &str = "application/octet-stream";
 
@@ -86,6 +88,11 @@ impl GoogleStorageObjectSource {
         Object::download_sync(self.bucket.as_str(), name).map_err(QuocoError::from)
     }
 
+    fn modify_unchecked(&self, name: &str, data: Vec<u8>) -> Result<()> {
+        Object::create_sync(self.bucket.as_str(), data, name, OBJECT_MIME_TYPE)?;
+        Ok(())
+    }
+
     fn modify_unchecked_reader<R: Read + Seek>(&self, name: &str, reader: &mut R) -> Result<()> {
         // Warning: This loads everything into memory before uploading. As far as I can tell, this
         // is a limitation of cloud_storage but I don't know if it's a limitation of Google's API.
@@ -95,9 +102,20 @@ impl GoogleStorageObjectSource {
         Ok(())
     }
 
-    fn modify_unchecked(&self, name: &str, data: Vec<u8>) -> Result<()> {
-        Object::create_sync(self.bucket.as_str(), data, name, OBJECT_MIME_TYPE)?;
-        Ok(())
+    fn modify_object_unchecked_reader<R: Read + Seek>(
+        &mut self,
+        id: &ObjectId,
+        reader: &mut R,
+        update_hash: bool,
+    ) -> Result<()> {
+        if update_hash {
+            // TODO: Avoid recomputing hash when modifying object on remote source by just getting it
+            //  from local hashes cache first
+            self.hashes.insert(id, &sha256(reader)?);
+            reader.seek(SeekFrom::Start(0))?;
+        }
+
+        self.modify_unchecked_reader(&bytes_to_hex_str(id), reader)
     }
 
     fn delete(&self, name: &str) -> Result<()> {
@@ -194,7 +212,7 @@ impl ObjectSource for GoogleStorageObjectSource {
             let uuid = Uuid::new_v4();
             *uuid.as_bytes()
         };
-        self.modify_unchecked_reader(&bytes_to_hex_str(&new_id), reader)?;
+        self.modify_object_unchecked_reader(&new_id, reader, true)?;
         Ok(new_id)
     }
 
@@ -202,7 +220,7 @@ impl ObjectSource for GoogleStorageObjectSource {
         self.check_lock()?;
 
         // TODO: Is it worth making an extra network call to check if the document doesn't exist?
-        self.modify_unchecked_reader(&bytes_to_hex_str(id), reader)
+        self.modify_object_unchecked_reader(id, reader, true)
     }
 
     fn object_hash(&self, id: &ObjectId) -> Result<&ObjectHash> {
