@@ -128,6 +128,7 @@ impl<D: ObjectSource> ObjectSource for CachedObjectSource<D> {
 
     fn create_object<R: Read + Seek>(&mut self, reader: &mut R) -> Result<ObjectId> {
         let id = self.inner.create_object(reader)?;
+        reader.seek(SeekFrom::Start(0))?;
         self.insert_reader(&id, reader)?;
 
         Ok(id)
