@@ -197,6 +197,8 @@ impl ObjectSource for FsObjectSource {
 
 impl Drop for FsObjectSource {
     fn drop(&mut self) {
+        // TODO: Based on BufWriter's Drop impl, I think it might be an anti-pattern to do anything
+        //  that could raise errors in drop. Look into this and refactor accordingly.
         self.flush().expect("Failed to flush.");
         self.unlock()
             .expect("Failed to release lock. You may have to release it manually.");
