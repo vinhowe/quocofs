@@ -15,7 +15,9 @@ use std::ptr::null;
 use std::{cmp, io};
 
 pub struct EncrypterWriter<W: Write> {
-    inner: W,
+    // Using an option here is a pattern from BufWriter that allows us to implement both Drop trait
+    // and into_inner method
+    inner: Option<W>,
     buf: [u8; CHUNK_LENGTH],
     buf_len: usize,
     chunk_buf: [u8; ENCRYPTED_CHUNK_LENGTH],
@@ -26,14 +28,15 @@ pub struct EncrypterWriter<W: Write> {
 
 /// Consumers *must call* [`finish`] to finish writing data. [`flush`] will only flush the inner
 /// writer. Doing it this way allows instances of this object to use the `Write` trait without
-/// stripping [`flush`] of its idempotence by awkwardly forcing consumers to only call it once.
+/// stripping [`flush`] of its idempotence by awkwardly forcing consumers to only call it once or
+/// finishing in Drop without error handling.
 /// This comes with the major drawback that EncrypterWriter can't be used transparently as an I/O
-/// writer. There is probably a much cleaner way to do this.
+/// writer. There is probably a much cleaner way to do this but I can't think what it is.
 impl<W: Write> EncrypterWriter<W> {
     pub fn new(writer: W, key: &Key) -> Self {
         #[allow(clippy::uninit_assumed_init)]
         EncrypterWriter {
-            inner: writer,
+            inner: Some(writer),
             buf: unsafe { MaybeUninit::<[u8; CHUNK_LENGTH]>::uninit().assume_init() },
             buf_len: 0,
             chunk_buf: unsafe {
@@ -61,7 +64,7 @@ impl<W: Write> EncrypterWriter<W> {
         }
 
         self.crypto_state = Some(unsafe { state.assume_init() });
-        self.inner.write_all(&header)?;
+        self.inner.as_mut().unwrap().write_all(&header)?;
 
         Ok(())
     }
@@ -96,13 +99,16 @@ impl<W: Write> EncrypterWriter<W> {
         }
 
         self.buf_len = 0;
-        self.inner.write_all(&self.chunk_buf[..out_len as usize])?;
+        self.inner
+            .as_mut()
+            .unwrap()
+            .write_all(&self.chunk_buf[..out_len as usize])?;
 
         Ok(())
     }
 
-    pub fn into_inner(self) -> W {
-        self.inner
+    pub fn into_inner(mut self) -> W {
+        self.inner.take().unwrap()
     }
 }
 
@@ -141,7 +147,14 @@ impl<W: Write> Write for EncrypterWriter<W> {
             return Err(io::ErrorKind::BrokenPipe.into());
         }
 
-        self.inner.flush()?;
+        self.inner.as_mut().unwrap().flush()?;
         Ok(())
+    }
+}
+
+impl<W: Write> Drop for EncrypterWriter<W> {
+    fn drop(&mut self) {
+        // Make sure consumer called finish()
+        assert!(self.finished, "You must call finish()")
     }
 }

@@ -1,7 +1,7 @@
 use std::io;
 use std::io::Write;
 
-// TODO: Copy or move explanation on why this trait is necessary
+/// Rationale for this trait at the beginning of EncrypterWriter
 pub trait Finish<W: Write> {
     fn finish(self) -> io::Result<W>;
 }
