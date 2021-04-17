@@ -106,10 +106,6 @@ impl<W: Write> EncrypterWriter<W> {
 
         Ok(())
     }
-
-    pub fn into_inner(mut self) -> W {
-        self.inner.take().unwrap()
-    }
 }
 
 impl<W: Write> Finish<W> for EncrypterWriter<W> {
@@ -117,7 +113,7 @@ impl<W: Write> Finish<W> for EncrypterWriter<W> {
         self.write_chunk(crypto_secretstream_xchacha20poly1305_TAG_FINAL as u8)?;
         self.flush()?;
         self.finished = true;
-        Ok(self.into_inner())
+        Ok(self.inner.take().unwrap())
     }
 }
 

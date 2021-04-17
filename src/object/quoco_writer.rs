@@ -17,10 +17,6 @@ impl<W: Write> QuocoWriter<W> {
             inner: CompressorWriter::new(EncrypterWriter::new(writer, &key), CHUNK_LENGTH, 8, 22),
         }
     }
-
-    pub fn into_inner(self) -> W {
-        self.inner.into_inner().into_inner()
-    }
 }
 
 impl<W: Write> Finish<W> for QuocoWriter<W> {
