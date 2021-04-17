@@ -278,12 +278,12 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
 
     #[pyfn(_m, "sha256")]
     fn sha256_py(py: Python, data: Vec<u8>) -> PyResult<&PyBytes> {
-        let mut hash = [0u8; HASH_LENGTH];
         let mut data_reader = Cursor::new(data);
 
-        sha256(&mut data_reader, hash.as_mut_ptr()).map_err(PyQuocoError)?;
-
-        Ok(PyBytes::new(py, &hash))
+        Ok(PyBytes::new(
+            py,
+            &sha256(&mut data_reader).map_err(PyQuocoError)?,
+        ))
     }
 
     Ok(())

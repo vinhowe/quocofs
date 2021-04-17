@@ -1,5 +1,5 @@
 use crate::error::QuocoError::{KeyGenerationError, UndeterminedError};
-use crate::object::{CHUNK_LENGTH, SALT_LENGTH};
+use crate::object::{CHUNK_LENGTH, HASH_LENGTH, SALT_LENGTH};
 use crate::Result;
 use libsodium_sys::{
     crypto_box_SEEDBYTES, crypto_hash_sha256_final, crypto_hash_sha256_init,
@@ -36,7 +36,7 @@ pub fn generate_key<'a>(
     Ok(key)
 }
 
-pub fn sha256<R: Read>(reader: &mut R, hash: *mut u8) -> Result<()> {
+pub fn sha256<R: Read>(reader: &mut R) -> Result<[u8; HASH_LENGTH]> {
     let mut state = MaybeUninit::<crypto_hash_sha256_state>::uninit();
     unsafe {
         if crypto_hash_sha256_init(state.as_mut_ptr()) != 0 {
@@ -47,6 +47,7 @@ pub fn sha256<R: Read>(reader: &mut R, hash: *mut u8) -> Result<()> {
 
     let mut in_chunk = [0u8; CHUNK_LENGTH as usize];
     let mut bytes_read;
+    let mut hash = [0u8; HASH_LENGTH];
     loop {
         bytes_read = reader.read(&mut in_chunk)?;
 
@@ -67,11 +68,11 @@ pub fn sha256<R: Read>(reader: &mut R, hash: *mut u8) -> Result<()> {
     }
 
     unsafe {
-        if crypto_hash_sha256_final(&mut state, hash as *mut _) != 0 {
+        if crypto_hash_sha256_final(&mut state, hash.as_mut_ptr()) != 0 {
             return Err(UndeterminedError);
         }
     }
-    Ok(())
+    Ok(hash)
 }
 
 pub fn is_shred_available() -> bool {
