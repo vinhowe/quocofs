@@ -9,7 +9,7 @@ use crate::error::QuocoError;
 use crate::error::QuocoError::{NoObjectWithName, ObjectDoesNotExist};
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use crate::object::fs_source::LOCK_FILE_NAME;
-use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
+use crate::object::{Finish, Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
 use crate::Result;
 
@@ -161,8 +161,7 @@ impl GoogleStorageObjectSource {
 
         let mut writer = QuocoWriter::new(format_data, &self.key);
         format.save(&mut writer)?;
-
-        self.modify_unchecked(object_name, writer.into_inner().into_inner())?;
+        self.modify_unchecked(object_name, writer.finish()?.into_inner())?;
 
         Ok(())
     }
