@@ -1,14 +1,15 @@
 use crate::error::QuocoError;
-use crate::error::QuocoError::{NoObjectWithName, ObjectDoesNotExist};
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use crate::object::finish::Finish;
 use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
-use crate::Result;
+use crate::{ReadSeek, Result};
+use std::collections::hash_map::{Iter, Keys};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::str;
+use std::time::SystemTime;
 use std::{fs, io};
 use uuid::Uuid;
 
@@ -58,10 +59,7 @@ impl FsObjectSource {
         &mut self,
         id: &ObjectId,
         reader: &mut R,
-        update_hash: bool,
     ) -> Result<()> {
-        // Allow skipping hash computation because it might have been done on another object source
-
         let object_file = OpenOptions::new()
             .write(true)
             .create(true)
@@ -69,12 +67,8 @@ impl FsObjectSource {
             .open(self.path.join(Path::new(&bytes_to_hex_str(id))))?;
         let mut writer = QuocoWriter::new(object_file, &self.key);
 
-        if update_hash {
-            // TODO: Avoid recomputing hash when modifying object on remote source by just getting it
-            //  from local hashes cache first
-            self.hashes.insert(id, &sha256(reader)?);
-            reader.seek(SeekFrom::Start(0))?;
-        }
+        self.hashes.insert(id, &sha256(reader)?);
+        reader.seek(SeekFrom::Start(0))?;
         io::copy(reader, &mut writer)
             .expect("Error when attempting to modify object on filesystem.");
         writer
@@ -116,19 +110,20 @@ impl FsObjectSource {
 
     pub fn check_no_lock(path: &Path) -> Result<()> {
         if path.join(LOCK_FILE_NAME).exists() {
-            return Err(QuocoError::SessionPathLocked(String::from(
-                path.to_str().unwrap(),
-            )));
+            return Err(QuocoError::SessionPathLocked(path.to_str().unwrap().into()));
         }
         Ok(())
     }
 }
 
 impl ObjectSource for FsObjectSource {
-    type OutReader = QuocoReader<File>;
-    fn object(&mut self, id: &ObjectId) -> Result<Self::OutReader> {
+    fn object(&mut self, id: &ObjectId) -> Result<Box<dyn Read>> {
         let object_path = self.path.join(&bytes_to_hex_str(id));
-        Ok(QuocoReader::new(fs::File::open(object_path)?, &self.key))
+
+        Ok(Box::new(QuocoReader::new(
+            fs::File::open(object_path)?,
+            &self.key,
+        )))
     }
 
     fn object_exists(&self, id: &ObjectId) -> Result<bool> {
@@ -138,43 +133,50 @@ impl ObjectSource for FsObjectSource {
     }
 
     fn delete_object(&mut self, id: &ObjectId) -> Result<()> {
+        self.check_lock()?;
+
+        self.hashes.remove(id);
+        self.names.remove(id);
+
         fs::remove_file(self.path.join(Path::new(&bytes_to_hex_str(id))))?;
 
         Ok(())
     }
 
-    fn create_object<InR: Read + Seek>(&mut self, reader: &mut InR) -> Result<ObjectId> {
+    fn create_object(&mut self, reader: &mut Box<dyn ReadSeek>) -> Result<ObjectId> {
         self.check_lock()?;
 
         let new_id = {
             let uuid = Uuid::new_v4();
             *uuid.as_bytes()
         };
-        self.modify_object_unchecked(&new_id, reader, true)?;
+        self.modify_object_unchecked(&new_id, reader)?;
 
         Ok(new_id)
     }
 
-    fn modify_object<InR: Read + Seek>(&mut self, id: &ObjectId, reader: &mut InR) -> Result<()> {
-        self.modify_object_unchecked(id, reader, true)
+    fn modify_object(&mut self, id: &ObjectId, reader: &mut Box<dyn ReadSeek>) -> Result<()> {
+        self.check_lock()?;
+
+        self.modify_object_unchecked(id, reader)
     }
 
-    fn object_hash(&self, id: &ObjectId) -> Result<&ObjectHash> {
-        self.check_lock().unwrap();
+    fn object_hash(&self, id: &ObjectId) -> Result<Option<&ObjectHash>> {
+        self.check_lock()?;
 
-        match self.hashes.get_hash(id) {
-            None => Err(ObjectDoesNotExist(*id)),
-            Some(hash) => Ok(hash),
-        }
+        Ok(self.hashes.get_hash(id))
     }
 
-    fn object_id_with_name(&self, name: &str) -> Result<&ObjectId> {
-        self.check_lock().unwrap();
+    fn object_name(&self, id: &ObjectId) -> Result<Option<&String>> {
+        self.check_lock()?;
 
-        match self.names.get_id(name) {
-            None => Err(NoObjectWithName(name.into())),
-            Some(name) => Ok(name),
-        }
+        Ok(self.names.get_name(id))
+    }
+
+    fn object_id_with_name(&self, name: &str) -> Result<Option<&ObjectId>> {
+        self.check_lock()?;
+
+        Ok(self.names.get_id(name))
     }
 
     fn set_object_name(&mut self, id: &[u8; 16], name: &str) -> Result<()> {
@@ -183,6 +185,42 @@ impl ObjectSource for FsObjectSource {
         self.names.insert(id, name);
 
         Ok(())
+    }
+
+    fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()> {
+        self.check_lock()?;
+
+        self.names.remove(id);
+
+        Ok(())
+    }
+
+    fn last_updated(&self) -> &SystemTime {
+        &self.hashes.get_last_updated()
+    }
+
+    fn names(&self) -> &Names {
+        &self.names
+    }
+
+    fn hashes(&self) -> &Hashes {
+        &self.hashes
+    }
+
+    fn hashes_iter(&mut self) -> Iter<'_, ObjectId, ObjectHash> {
+        self.hashes.iter()
+    }
+
+    fn names_iter(&mut self) -> Iter<'_, ObjectId, String> {
+        self.names.iter()
+    }
+
+    fn hashes_ids(&mut self) -> Keys<'_, ObjectId, ObjectHash> {
+        self.hashes.get_ids()
+    }
+
+    fn names_ids(&mut self) -> Keys<'_, ObjectId, String> {
+        self.names.get_ids()
     }
 
     fn flush(&mut self) -> Result<()> {

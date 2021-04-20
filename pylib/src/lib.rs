@@ -13,7 +13,6 @@ use quocofs::util::{generate_key, sha256};
 use quocofs::*;
 use std::io;
 use std::io::{Cursor, Read};
-use std::path::PathBuf;
 
 create_exception!(module, EncryptionError, exceptions::PyException);
 create_exception!(module, DecryptionError, exceptions::PyException);
@@ -25,8 +24,9 @@ create_exception!(module, EncryptionInputTooLong, exceptions::PyException);
 create_exception!(module, UndeterminedError, exceptions::PyException);
 create_exception!(module, SessionDisposed, exceptions::PyException);
 create_exception!(module, SessionPathLocked, exceptions::PyException);
-create_exception!(module, ObjectDoesNotExist, exceptions::PyException);
-create_exception!(module, NoObjectWithName, exceptions::PyException);
+create_exception!(module, NoRemotes, exceptions::PyException);
+create_exception!(module, TempFileDeleteFailed, exceptions::PyException);
+create_exception!(module, TempFileDeletesFailed, exceptions::PyException);
 create_exception!(module, GoogleStorageError, exceptions::PyException);
 
 struct PyQuocoError(QuocoError);
@@ -47,8 +47,11 @@ impl From<PyQuocoError> for PyErr {
             QuocoError::UndeterminedError => UndeterminedError::new_err(err.0.to_string()),
             QuocoError::SessionDisposed => SessionDisposed::new_err(err.0.to_string()),
             QuocoError::SessionPathLocked(_) => SessionPathLocked::new_err(err.0.to_string()),
-            QuocoError::ObjectDoesNotExist(_) => ObjectDoesNotExist::new_err(err.0.to_string()),
-            QuocoError::NoObjectWithName(_) => NoObjectWithName::new_err(err.0.to_string()),
+            QuocoError::NoRemotes => NoRemotes::new_err(err.0.to_string()),
+            QuocoError::TempFileDeleteFailed(_) => TempFileDeleteFailed::new_err(err.0.to_string()),
+            QuocoError::TempFileDeletesFailed(_) => {
+                TempFileDeletesFailed::new_err(err.0.to_string())
+            }
             QuocoError::GoogleStorageError(_) => GoogleStorageError::new_err(err.0.to_string()),
         }
     }
@@ -86,7 +89,7 @@ impl PyRemoteAccessConfigProvider for GoogleStorageAccessorConfig {
     fn create(self) -> RemoteSourceConfig {
         RemoteSourceConfig::GoogleStorage {
             bucket: self.bucket,
-            config_path: PathBuf::from(self.config_path),
+            config_path: self.config_path.into(),
         }
     }
 }
@@ -99,16 +102,18 @@ struct PySession {
 #[pymethods]
 impl PySession {
     #[new]
-    fn new(path: &str, key: Key, remote_config: Option<&PyAny>) -> PyResult<Self> {
+    fn new(path: &str, key: Key, remote: Option<&PyAny>) -> PyResult<Self> {
         Ok(PySession {
             id: new_session(
                 path,
                 &key,
-                remote_config
-                    .map(|c| c.extract().expect("Couldn't extract remote config type"))
-                    .map(|c| match c {
-                        GoogleStorageAccessorConfig { .. } => c.create(),
-                    }),
+                remote
+                    .map(|c| {
+                        c.extract().map(|c| match c {
+                            GoogleStorageAccessorConfig { .. } => c.create(),
+                        } as RemoteSourceConfig)
+                    })
+                    .transpose()?,
             )
             .map_err(PyQuocoError)?,
         })
@@ -130,7 +135,7 @@ impl PySession {
         let object_id = get_session(&self.id)
             .borrow_mut()
             .local
-            .create_object(&mut Cursor::new(data))
+            .create_object(&mut (Box::new(Cursor::new(data)) as Box<dyn ReadSeek>))
             .map_err(PyQuocoError)?;
 
         Ok(PyBytes::new(py, &object_id))
@@ -140,7 +145,7 @@ impl PySession {
         get_session(&self.id)
             .borrow_mut()
             .local
-            .modify_object(&id, &mut Cursor::new(data))
+            .modify_object(&id, &mut (Box::new(Cursor::new(data)) as Box<dyn ReadSeek>))
             .map_err(PyQuocoError)?;
 
         Ok(())
@@ -156,11 +161,12 @@ impl PySession {
         Ok(())
     }
 
-    fn object_id_with_name(&self, name: &str) -> PyResult<ObjectId> {
-        Ok(*get_session(&self.id)
+    fn object_id_with_name(&self, name: &str) -> PyResult<Option<ObjectId>> {
+        Ok(get_session(&self.id)
             .borrow()
             .local
             .object_id_with_name(name)
+            .map(|o| o.copied())
             .map_err(PyQuocoError)?)
     }
 
@@ -200,19 +206,40 @@ impl PySession {
 
         Ok(())
     }
+
+    fn push_remote(&self) -> PyResult<()> {
+        get_session(&self.id)
+            .borrow_mut()
+            .push_remote()
+            .map_err(PyQuocoError)?;
+
+        Ok(())
+    }
+
+    fn pull_remote(&self) -> PyResult<()> {
+        get_session(&self.id)
+            .borrow_mut()
+            .pull_remote()
+            .map_err(PyQuocoError)?;
+
+        Ok(())
+    }
 }
 
 #[pyproto]
 impl PyContextProtocol for PySession {
-    fn __enter__(&mut self) -> () {}
+    fn __enter__(&mut self) -> PyResult<()> {
+        self.pull_remote()
+    }
 
     fn __exit__(
         &mut self,
         _ty: Option<&PyType>,
         _value: Option<&PyAny>,
         _traceback: Option<&PyAny>,
-    ) -> bool {
-        close_session(&self.id)
+    ) -> PyResult<bool> {
+        self.push_remote()?;
+        Ok(close_session(&self.id))
     }
 }
 
@@ -239,10 +266,16 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
         _py.get_type::<EncryptionInputTooLong>(),
     )?;
     _m.add("Undetermined", _py.get_type::<UndeterminedError>())?;
+    _m.add(
+        "TempFileDeleteFailed",
+        _py.get_type::<TempFileDeleteFailed>(),
+    )?;
+    _m.add(
+        "TempFileDeletesFailed",
+        _py.get_type::<TempFileDeletesFailed>(),
+    )?;
     _m.add("SessionDisposed", _py.get_type::<SessionDisposed>())?;
     _m.add("SessionPathLocked", _py.get_type::<SessionPathLocked>())?;
-    _m.add("ObjectDoesNotExist", _py.get_type::<ObjectDoesNotExist>())?;
-    _m.add("NoObjectWithName", _py.get_type::<NoObjectWithName>())?;
     _m.add("GoogleStorageError", _py.get_type::<GoogleStorageError>())?;
 
     // Classes

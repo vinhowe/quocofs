@@ -1,7 +1,7 @@
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, NAMES};
 use crate::object::{ObjectId, UUID_LENGTH};
 use crate::Result;
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use std::io::{BufRead, Read, Write};
 use std::ops::Index;
 
@@ -22,12 +22,32 @@ impl Names {
         self.data.insert(*id, name.into())
     }
 
+    pub fn remove(&mut self, id: &ObjectId) -> Option<String> {
+        self.data.remove(id)
+    }
+
+    pub fn remove_name(&mut self, name: &str) -> Option<ObjectId> {
+        if let Some(id) = self.get_id(name).copied() {
+            return self.data.remove(&id).map(|_| id);
+        }
+
+        None
+    }
+
     pub fn get_name(&self, id: &ObjectId) -> Option<&String> {
         self.data.get(id)
     }
 
     pub fn get_id(&self, name: &str) -> Option<&ObjectId> {
         self.data.iter().find(|x| *x.1 == name).map(|x| x.0)
+    }
+
+    pub fn get_ids(&self) -> hash_map::Keys<'_, ObjectId, String> {
+        self.data.keys()
+    }
+
+    pub fn iter(&self) -> hash_map::Iter<'_, ObjectId, String> {
+        self.data.iter()
     }
 }
 

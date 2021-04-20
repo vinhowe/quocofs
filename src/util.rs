@@ -1,4 +1,4 @@
-use crate::error::QuocoError::{KeyGenerationError, UndeterminedError};
+use crate::error::QuocoError::{KeyGenerationError, TempFileDeleteFailed, UndeterminedError};
 use crate::object::{CHUNK_LENGTH, HASH_LENGTH, SALT_LENGTH};
 use crate::Result;
 use libsodium_sys::{
@@ -89,21 +89,25 @@ pub fn is_shred_available() -> bool {
         .success()
 }
 
-pub fn shred_file(path: &Path) -> bool {
+pub fn shred_file(path: &Path) -> Result<()> {
     // -u flag deletes the file after overwriting it
     if let Ok(status) = Command::new("shred")
         .arg("-u")
         .arg(path.as_os_str())
         .status()
     {
-        return status.success();
+        if !status.success() {
+            // TODO: Figure out how to make this
+            return Err(TempFileDeleteFailed(path.to_str().unwrap().to_string()));
+        }
     }
 
-    false
+    Ok(())
 }
 
-pub fn delete_file(path: &Path) -> bool {
-    fs::remove_file(path).is_ok()
+pub fn delete_file(path: &Path) -> Result<()> {
+    fs::remove_file(path)?;
+    Ok(())
 }
 
 pub fn bytes_to_hex_str(bytes: &[u8]) -> String {
@@ -112,4 +116,36 @@ pub fn bytes_to_hex_str(bytes: &[u8]) -> String {
 
 pub fn hex_str_to_bytes(hex: &str) -> Vec<u8> {
     hex::decode(hex).expect("Couldn't decode byte string")
+}
+
+// TODO: Come up with a more descriptive name for this and its arguments
+pub fn sync_primary_replica<T, Ra, A>(
+    primary: &Option<T>,
+    replica: &Option<T>,
+    modify: A,
+) -> Result<()>
+where
+    T: Eq,
+    A: FnOnce(Option<&T>, bool) -> Result<Ra>,
+{
+    let mut values_eq = false;
+    if replica.is_none()
+        || (primary.is_some() && {
+            values_eq = primary.as_ref().unwrap() == replica.as_ref().unwrap();
+            !values_eq
+        })
+    {
+        // We can assume that primary will have a value at this branch
+        modify(primary.as_ref(), true)?;
+        return Ok(());
+    }
+
+    // If both had values and neq each other, then the statement above would have been
+    // called
+    if values_eq {
+        return Ok(());
+    }
+
+    modify(None, false)?;
+    Ok(())
 }

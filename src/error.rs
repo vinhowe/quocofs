@@ -1,7 +1,5 @@
 use crate::formats::ReferenceFormatSpecification;
-use crate::object::{ObjectId, MAX_DATA_LENGTH, MAX_NAME_LENGTH};
-use crate::util::bytes_to_hex_str;
-use std::borrow::Borrow;
+use crate::object::{MAX_DATA_LENGTH, MAX_NAME_LENGTH};
 use std::string::String;
 
 #[derive(Debug)]
@@ -31,8 +29,10 @@ pub enum QuocoError {
     SessionPathLocked(String),
     SessionDisposed,
     UndeterminedError,
-    ObjectDoesNotExist(ObjectId),
-    NoObjectWithName(String),
+    /// No remote object sources were found
+    NoRemotes,
+    TempFileDeleteFailed(String),
+    TempFileDeletesFailed(Vec<(String, QuocoError)>),
     GoogleStorageError(cloud_storage::Error),
     /// Any otherwise unhandled `std::io::Error`.
     IoError(std::io::Error),
@@ -49,9 +49,10 @@ impl std::error::Error for QuocoError {
             | QuocoError::NameTooLong(_)
             | QuocoError::KeyGenerationError
             | QuocoError::SessionPathLocked(_)
-            | QuocoError::ObjectDoesNotExist(_)
-            | QuocoError::NoObjectWithName(_)
             | QuocoError::SessionDisposed
+            | QuocoError::NoRemotes
+            | QuocoError::TempFileDeleteFailed(_)
+            | QuocoError::TempFileDeletesFailed(_)
             | QuocoError::UndeterminedError => None,
             QuocoError::GoogleStorageError(ref err) => err.source(),
             QuocoError::IoError(ref err) => err.source(),
@@ -84,31 +85,7 @@ impl From<cloud_storage::Error> for QuocoError {
 
 impl From<QuocoError> for std::io::Error {
     fn from(err: QuocoError) -> std::io::Error {
-        let kind = match err.borrow() {
-            QuocoError::EncryptionError(err_type) | QuocoError::DecryptionError(err_type) => {
-                match err_type {
-                    EncryptionErrorType::Header | EncryptionErrorType::Body => {
-                        std::io::ErrorKind::InvalidData
-                    }
-                    EncryptionErrorType::Other(_) => std::io::ErrorKind::Other,
-                }
-            }
-            QuocoError::EmptyInput
-            | QuocoError::InvalidMagicBytes(_)
-            | QuocoError::NameTooLong(_)
-            | QuocoError::EncryptionInputTooLong(_) => std::io::ErrorKind::InvalidData,
-            QuocoError::SessionPathLocked(_) => std::io::ErrorKind::AlreadyExists,
-            QuocoError::ObjectDoesNotExist(_) | QuocoError::NoObjectWithName(_) => {
-                std::io::ErrorKind::NotFound
-            }
-            QuocoError::SessionDisposed => std::io::ErrorKind::BrokenPipe,
-            QuocoError::KeyGenerationError
-            | QuocoError::UndeterminedError
-            | QuocoError::GoogleStorageError(_) => std::io::ErrorKind::Other,
-            QuocoError::IoError(err) => return err.kind().into(),
-        };
-
-        std::io::Error::new(kind, err)
+        std::io::Error::new(std::io::ErrorKind::Other, err)
     }
 }
 
@@ -116,52 +93,60 @@ impl std::fmt::Display for QuocoError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             QuocoError::EncryptionError(error_type) => match error_type {
-                EncryptionErrorType::Header => write!(f, "Error creating encryption header."),
-                EncryptionErrorType::Body => write!(f, "Encryption failed."),
+                EncryptionErrorType::Header => write!(f, "Error creating encryption header"),
+                EncryptionErrorType::Body => write!(f, "Encryption failed"),
                 EncryptionErrorType::Other(msg) => write!(f, "{}", msg),
             },
             QuocoError::DecryptionError(error_type) => match error_type {
-                EncryptionErrorType::Header => write!(f, "Failed to read decryption header."),
-                EncryptionErrorType::Body => write!(f, "Decryption failed."),
+                EncryptionErrorType::Header => write!(f, "Failed to read decryption header"),
+                EncryptionErrorType::Body => write!(f, "Decryption failed"),
                 EncryptionErrorType::Other(msg) => write!(f, "{}", msg),
             },
             QuocoError::EmptyInput => {
-                write!(f, "Input must not be empty.")
+                write!(f, "Input must not be empty")
             }
             QuocoError::EncryptionInputTooLong(length) => {
                 write!(
                     f,
-                    "Encryption input stream too large ({} bytes > {} max).",
+                    "Encryption input stream too large ({} bytes > {} max)",
                     length, MAX_DATA_LENGTH
                 )
             }
             QuocoError::NameTooLong(length) => {
                 write!(
                     f,
-                    "Name too long ({} bytes > {} max).",
+                    "Name too long ({} bytes > {} max)",
                     length, MAX_NAME_LENGTH
                 )
             }
             QuocoError::KeyGenerationError => {
-                write!(f, "Key generation failed.")
+                write!(f, "Key generation failed")
             }
             QuocoError::SessionPathLocked(path) => {
-                write!(f, "Path {} is locked by another process", path)
+                write!(f, "Path {} is locked by another process or a previous session failed to exit cleanly", path)
             }
             QuocoError::SessionDisposed => {
-                write!(f, "Attempted to use session after clearing lock.")
+                write!(f, "Attempted to use session after clearing lock")
             }
             QuocoError::InvalidMagicBytes(data_type) => {
-                write!(f, "Invalid magic bytes for {} data.", data_type)
+                write!(f, "Invalid magic bytes for {} data", data_type)
             }
-            QuocoError::ObjectDoesNotExist(id) => {
-                write!(f, "Object with ID {} not found.", bytes_to_hex_str(id))
-            }
-            QuocoError::NoObjectWithName(name) => {
-                write!(f, "No object found with name \"{}\".", name)
+            QuocoError::NoRemotes => {
+                write!(f, "No remotes configured")
             }
             QuocoError::UndeterminedError => {
-                write!(f, "Undetermined error.")
+                write!(f, "Undetermined error")
+            }
+            QuocoError::TempFileDeleteFailed(path) => {
+                write!(f, "Failed to delete temp file at path {}", path)
+            }
+            QuocoError::TempFileDeletesFailed(errors) => {
+                // TODO: See if mutli-line errors are a huge issue for formatting
+                write!(f, "Failed to delete temp files at paths:")?;
+                for (path, error) in errors {
+                    write!(f, "\n\t{}: {}", path, error)?;
+                }
+                Ok(())
             }
             QuocoError::GoogleStorageError(ref err) => err.fmt(f),
             QuocoError::IoError(ref err) => err.fmt(f),

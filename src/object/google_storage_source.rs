@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
 use std::str;
 
@@ -6,12 +6,13 @@ use cloud_storage::{Error, Object};
 use uuid::Uuid;
 
 use crate::error::QuocoError;
-use crate::error::QuocoError::{NoObjectWithName, ObjectDoesNotExist};
 use crate::formats::{Hashes, Names, ReferenceFormat};
 use crate::object::fs_source::LOCK_FILE_NAME;
 use crate::object::{Finish, Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
-use crate::Result;
+use crate::{ReadSeek, Result};
+use std::collections::hash_map::{Iter, Keys};
+use std::time::SystemTime;
 
 const OBJECT_MIME_TYPE: &str = "application/octet-stream";
 
@@ -96,9 +97,11 @@ impl GoogleStorageObjectSource {
     fn modify_unchecked_reader<R: Read + Seek>(&self, name: &str, reader: &mut R) -> Result<()> {
         // Warning: This loads everything into memory before uploading. As far as I can tell, this
         // is a limitation of cloud_storage but I don't know if it's a limitation of Google's API.
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data)?;
-        self.modify_unchecked(name, data)?;
+        let data = Vec::new();
+        let mut writer = QuocoWriter::new(data, &self.key);
+        std::io::copy(reader, &mut writer)?;
+        self.modify_unchecked(name, writer.finish()?)?;
+
         Ok(())
     }
 
@@ -106,15 +109,9 @@ impl GoogleStorageObjectSource {
         &mut self,
         id: &ObjectId,
         reader: &mut R,
-        update_hash: bool,
     ) -> Result<()> {
-        if update_hash {
-            // TODO: Avoid recomputing hash when modifying object on remote source by just getting it
-            //  from local hashes cache first
-            self.hashes.insert(id, &sha256(reader)?);
-            reader.seek(SeekFrom::Start(0))?;
-        }
-
+        self.hashes.insert(id, &sha256(reader)?);
+        reader.seek(SeekFrom::Start(0))?;
         self.modify_unchecked_reader(&bytes_to_hex_str(id), reader)
     }
 
@@ -125,7 +122,7 @@ impl GoogleStorageObjectSource {
 
     fn with_name_exists(bucket: &str, name: &str) -> Result<bool> {
         match Object::read_sync(bucket, name) {
-            Ok(_) => Ok(false),
+            Ok(_) => Ok(true),
             Err(err) => match err {
                 Error::Google(ref response) => {
                     if response.errors_has_reason(&cloud_storage::Reason::NotFound) {
@@ -144,12 +141,17 @@ impl GoogleStorageObjectSource {
         let hashes_name = Hashes::specification().name;
 
         if Self::with_name_exists(self.bucket.as_str(), names_name)? {
-            self.names
-                .load(&mut Cursor::new(self.get_object_bytes(names_name)?))?;
+            // TODO: See if there's any way to make this mess cleaner
+            self.names.load(&mut BufReader::new(&mut QuocoReader::new(
+                &mut Cursor::new(self.get_object_bytes(names_name)?),
+                &self.key,
+            )))?;
         }
         if Self::with_name_exists(self.bucket.as_str(), hashes_name)? {
-            self.hashes
-                .load(&mut Cursor::new(self.get_object_bytes(hashes_name)?))?;
+            self.hashes.load(&mut BufReader::new(&mut QuocoReader::new(
+                &mut Cursor::new(self.get_object_bytes(hashes_name)?),
+                &self.key,
+            )))?;
         }
 
         Ok(())
@@ -181,15 +183,13 @@ impl GoogleStorageObjectSource {
 }
 
 impl ObjectSource for GoogleStorageObjectSource {
-    type OutReader = QuocoReader<Cursor<Vec<u8>>>;
-
-    fn object(&mut self, id: &ObjectId) -> Result<Self::OutReader> {
+    fn object(&mut self, id: &ObjectId) -> Result<Box<dyn Read>> {
         self.check_lock()?;
 
-        Ok(QuocoReader::new(
+        Ok(Box::new(QuocoReader::new(
             Cursor::new(self.get_object_bytes(&bytes_to_hex_str(id))?),
             &self.key,
-        ))
+        )))
     }
 
     fn object_exists(&self, id: &ObjectId) -> Result<bool> {
@@ -201,43 +201,46 @@ impl ObjectSource for GoogleStorageObjectSource {
     fn delete_object(&mut self, id: &ObjectId) -> Result<()> {
         self.check_lock()?;
 
+        self.hashes.remove(id);
+        self.names.remove(id);
+
         self.delete(&bytes_to_hex_str(id))
     }
 
-    fn create_object<R: Read + Seek>(&mut self, reader: &mut R) -> Result<ObjectId> {
+    fn create_object(&mut self, reader: &mut Box<dyn ReadSeek>) -> Result<ObjectId> {
         self.check_lock()?;
 
         let new_id = {
             let uuid = Uuid::new_v4();
             *uuid.as_bytes()
         };
-        self.modify_object_unchecked_reader(&new_id, reader, true)?;
+        self.modify_object_unchecked_reader(&new_id, reader)?;
         Ok(new_id)
     }
 
-    fn modify_object<R: Read + Seek>(&mut self, id: &ObjectId, reader: &mut R) -> Result<()> {
+    fn modify_object(&mut self, id: &ObjectId, reader: &mut Box<dyn ReadSeek>) -> Result<()> {
         self.check_lock()?;
 
         // TODO: Is it worth making an extra network call to check if the document doesn't exist?
-        self.modify_object_unchecked_reader(id, reader, true)
+        self.modify_object_unchecked_reader(id, reader)
     }
 
-    fn object_hash(&self, id: &ObjectId) -> Result<&ObjectHash> {
+    fn object_hash(&self, id: &ObjectId) -> Result<Option<&ObjectHash>> {
         self.check_lock()?;
 
-        match self.hashes.get_hash(id) {
-            None => Err(ObjectDoesNotExist(*id)),
-            Some(hash) => Ok(hash),
-        }
+        Ok(self.hashes.get_hash(id))
     }
 
-    fn object_id_with_name(&self, name: &str) -> Result<&ObjectId> {
+    fn object_name(&self, id: &ObjectId) -> Result<Option<&String>> {
         self.check_lock()?;
 
-        match self.names.get_id(name) {
-            None => Err(NoObjectWithName(name.into())),
-            Some(name) => Ok(name),
-        }
+        Ok(self.names.get_name(id))
+    }
+
+    fn object_id_with_name(&self, name: &str) -> Result<Option<&ObjectId>> {
+        self.check_lock()?;
+
+        Ok(self.names.get_id(name))
     }
 
     fn set_object_name(&mut self, id: &[u8; 16], name: &str) -> Result<()> {
@@ -246,6 +249,42 @@ impl ObjectSource for GoogleStorageObjectSource {
         self.names.insert(id, name);
 
         Ok(())
+    }
+
+    fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()> {
+        self.check_lock()?;
+
+        self.names.remove(id);
+
+        Ok(())
+    }
+
+    fn last_updated(&self) -> &SystemTime {
+        &self.hashes.get_last_updated()
+    }
+
+    fn names(&self) -> &Names {
+        &self.names
+    }
+
+    fn hashes(&self) -> &Hashes {
+        &self.hashes
+    }
+
+    fn hashes_iter(&mut self) -> Iter<'_, ObjectId, ObjectHash> {
+        self.hashes.iter()
+    }
+
+    fn names_iter(&mut self) -> Iter<'_, ObjectId, String> {
+        self.names.iter()
+    }
+
+    fn hashes_ids(&mut self) -> Keys<'_, ObjectId, ObjectHash> {
+        self.hashes.get_ids()
+    }
+
+    fn names_ids(&mut self) -> Keys<'_, ObjectId, String> {
+        self.names.get_ids()
     }
 
     fn flush(&mut self) -> Result<()> {

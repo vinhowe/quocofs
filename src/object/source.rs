@@ -1,17 +1,31 @@
+use crate::formats::{Hashes, Names};
 use crate::object::{ObjectHash, ObjectId};
-use crate::Result;
-use std::io::{Read, Seek};
+use crate::{ReadSeek, Result};
+use std::collections::hash_map;
+use std::io::Read;
+use std::time::SystemTime;
+
+// pub type BoxedObjectSource = Box<dyn ObjectSource<OutReader = dyn Read + Send> + Send>;
+pub type BoxedObjectSource = Box<dyn ObjectSource + Send>;
 
 pub trait ObjectSource {
-    type OutReader: Read;
-
-    fn object(&mut self, id: &ObjectId) -> Result<Self::OutReader>;
+    fn object(&mut self, id: &ObjectId) -> Result<Box<dyn Read>>;
     fn object_exists(&self, id: &ObjectId) -> Result<bool>;
     fn delete_object(&mut self, id: &ObjectId) -> Result<()>;
-    fn create_object<InR: Read + Seek>(&mut self, reader: &mut InR) -> Result<ObjectId>;
-    fn modify_object<InR: Read + Seek>(&mut self, id: &ObjectId, reader: &mut InR) -> Result<()>;
-    fn object_hash(&self, id: &ObjectId) -> Result<&ObjectHash>;
-    fn object_id_with_name(&self, name: &str) -> Result<&ObjectId>;
+    fn create_object(&mut self, reader: &mut Box<dyn ReadSeek>) -> Result<ObjectId>;
+    fn modify_object(&mut self, id: &ObjectId, reader: &mut Box<dyn ReadSeek>) -> Result<()>;
+    fn object_hash(&self, id: &ObjectId) -> Result<Option<&ObjectHash>>;
+    fn object_name(&self, id: &ObjectId) -> Result<Option<&String>>;
+    fn object_id_with_name(&self, name: &str) -> Result<Option<&ObjectId>>;
     fn set_object_name(&mut self, id: &ObjectId, name: &str) -> Result<()>;
+    fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()>;
+    fn last_updated(&self) -> &SystemTime;
+    // TODO: Gradually expose methods to access names and hashes and then remove these getters.
+    fn names(&self) -> &Names;
+    fn hashes(&self) -> &Hashes;
+    fn hashes_iter(&mut self) -> hash_map::Iter<'_, ObjectId, ObjectHash>;
+    fn names_iter(&mut self) -> hash_map::Iter<'_, ObjectId, String>;
+    fn hashes_ids(&mut self) -> hash_map::Keys<'_, ObjectId, ObjectHash>;
+    fn names_ids(&mut self) -> hash_map::Keys<'_, ObjectId, String>;
     fn flush(&mut self) -> Result<()>;
 }

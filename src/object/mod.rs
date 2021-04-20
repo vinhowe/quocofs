@@ -13,6 +13,7 @@ pub use crate::object::quoco_reader::QuocoReader;
 pub use crate::object::quoco_writer::QuocoWriter;
 pub use crate::object::remote_source::{RemoteSource, RemoteSourceConfig};
 pub use crate::object::source::ObjectSource;
+pub use crate::object::source::BoxedObjectSource;
 
 mod cached_source;
 mod decrypt_reader;
@@ -38,4 +39,4 @@ pub const HASH_LENGTH: usize = crypto_hash_sha256_BYTES as usize;
 pub const UUID_LENGTH: usize = 16;
 pub type ObjectId = [u8; UUID_LENGTH];
 pub type ObjectHash = [u8; HASH_LENGTH];
-pub type Key = [u8; HASH_LENGTH];
+pub type Key = [u8; KEY_LENGTH];

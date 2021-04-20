@@ -1,7 +1,7 @@
 use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, HASHES};
 use crate::object::{ObjectHash, ObjectId, HASH_LENGTH, UUID_LENGTH};
 use crate::Result;
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use std::convert::TryInto;
 use std::io::{BufRead, Read, Write};
 use std::mem::size_of;
@@ -27,12 +27,28 @@ impl Hashes {
         self.data.insert(*id, *hash)
     }
 
+    pub fn remove(&mut self, id: &ObjectId) -> Option<ObjectHash> {
+        self.data.remove(id)
+    }
+
     pub fn get_hash(&self, id: &ObjectId) -> Option<&ObjectHash> {
         self.data.get(id)
     }
 
     pub fn get_id(&self, hash: &ObjectHash) -> Option<&ObjectId> {
         self.data.iter().find(|x| *x.1 == *hash).map(|x| x.0)
+    }
+
+    pub fn get_last_updated(&self) -> &SystemTime {
+        &self.last_updated
+    }
+
+    pub fn get_ids(&self) -> hash_map::Keys<'_, ObjectId, ObjectHash> {
+        self.data.keys()
+    }
+
+    pub fn iter(&self) -> hash_map::Iter<'_, ObjectId, ObjectHash> {
+        self.data.iter()
     }
 }
 
