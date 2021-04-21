@@ -16,3 +16,9 @@ hex = "0.4.3"
 bytes = "1.0.1"
 cloud-storage = { version = "0.8", features = ["sync"] }
 backtrace = "0.3.56"
+
+[workspace]
+# TODO: Consider putting the core library in a subdirectory alongside pylib
+members = [
+    "pylib"
+]
