@@ -4,7 +4,7 @@ use crate::object::finish::Finish;
 use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
 use crate::{ReadSeek, Result};
-use std::collections::hash_map::{Iter, Keys};
+use std::collections::hash_map::{Keys};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -197,22 +197,6 @@ impl ObjectSource for FsObjectSource {
 
     fn last_updated(&self) -> &SystemTime {
         &self.hashes.get_last_updated()
-    }
-
-    fn names(&self) -> &Names {
-        &self.names
-    }
-
-    fn hashes(&self) -> &Hashes {
-        &self.hashes
-    }
-
-    fn hashes_iter(&mut self) -> Iter<'_, ObjectId, ObjectHash> {
-        self.hashes.iter()
-    }
-
-    fn names_iter(&mut self) -> Iter<'_, ObjectId, String> {
-        self.names.iter()
     }
 
     fn hashes_ids(&mut self) -> Keys<'_, ObjectId, ObjectHash> {

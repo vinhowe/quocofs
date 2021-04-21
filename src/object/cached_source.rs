@@ -1,13 +1,12 @@
-use crate::formats::{Hashes, Names};
 use crate::object::{BoxedObjectSource, ObjectHash, ObjectId, ObjectSource};
 use crate::{ReadSeek, Result};
+use std::collections::hash_map::Keys;
 use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::ops::Index;
 use std::str;
 use std::time::SystemTime;
-use std::collections::hash_map::{Iter, Keys};
 
 /// Max cache size in bytes (2 GiB)
 const MAX_CACHE_SIZE: usize = 1024 * 1024 * 1024 * 2;
@@ -176,22 +175,6 @@ impl ObjectSource for CachedObjectSource {
 
     fn last_updated(&self) -> &SystemTime {
         &self.inner.last_updated()
-    }
-
-    fn names(&self) -> &Names {
-        self.inner.names()
-    }
-
-    fn hashes(&self) -> &Hashes {
-        self.inner.hashes()
-    }
-
-    fn hashes_iter(&mut self) -> Iter<'_, ObjectId, ObjectHash> {
-        self.inner.hashes_iter()
-    }
-
-    fn names_iter(&mut self) -> Iter<'_, ObjectId, String> {
-        self.inner.names_iter()
     }
 
     fn hashes_ids(&mut self) -> Keys<'_, ObjectId, ObjectHash> {

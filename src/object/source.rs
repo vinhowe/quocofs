@@ -1,4 +1,3 @@
-use crate::formats::{Hashes, Names};
 use crate::object::{ObjectHash, ObjectId};
 use crate::{ReadSeek, Result};
 use std::collections::hash_map;
@@ -20,11 +19,6 @@ pub trait ObjectSource {
     fn set_object_name(&mut self, id: &ObjectId, name: &str) -> Result<()>;
     fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()>;
     fn last_updated(&self) -> &SystemTime;
-    // TODO: Gradually expose methods to access names and hashes and then remove these getters.
-    fn names(&self) -> &Names;
-    fn hashes(&self) -> &Hashes;
-    fn hashes_iter(&mut self) -> hash_map::Iter<'_, ObjectId, ObjectHash>;
-    fn names_iter(&mut self) -> hash_map::Iter<'_, ObjectId, String>;
     fn hashes_ids(&mut self) -> hash_map::Keys<'_, ObjectId, ObjectHash>;
     fn names_ids(&mut self) -> hash_map::Keys<'_, ObjectId, String>;
     fn flush(&mut self) -> Result<()>;

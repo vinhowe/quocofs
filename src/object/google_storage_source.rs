@@ -11,7 +11,7 @@ use crate::object::fs_source::LOCK_FILE_NAME;
 use crate::object::{Finish, Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
 use crate::{ReadSeek, Result};
-use std::collections::hash_map::{Iter, Keys};
+use std::collections::hash_map::{Keys};
 use std::time::SystemTime;
 
 const OBJECT_MIME_TYPE: &str = "application/octet-stream";
@@ -261,22 +261,6 @@ impl ObjectSource for GoogleStorageObjectSource {
 
     fn last_updated(&self) -> &SystemTime {
         &self.hashes.get_last_updated()
-    }
-
-    fn names(&self) -> &Names {
-        &self.names
-    }
-
-    fn hashes(&self) -> &Hashes {
-        &self.hashes
-    }
-
-    fn hashes_iter(&mut self) -> Iter<'_, ObjectId, ObjectHash> {
-        self.hashes.iter()
-    }
-
-    fn names_iter(&mut self) -> Iter<'_, ObjectId, String> {
-        self.names.iter()
     }
 
     fn hashes_ids(&mut self) -> Keys<'_, ObjectId, ObjectHash> {
