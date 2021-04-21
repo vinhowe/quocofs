@@ -32,6 +32,7 @@ jobs:
             ~/.cargo/git
             target
           key: clippy
+        continue-on-error: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
