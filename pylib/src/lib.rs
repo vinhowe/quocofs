@@ -109,6 +109,8 @@ impl PySession {
                 &key,
                 remote
                     .map(|c| {
+                        // TODO: Remove this once we add more remote providers
+                        #[allow(clippy::match_single_binding)]
                         c.extract().map(|c| match c {
                             GoogleStorageAccessorConfig { .. } => c.create(),
                         } as RemoteSourceConfig)
