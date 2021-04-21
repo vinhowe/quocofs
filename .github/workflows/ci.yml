@@ -65,7 +65,7 @@ jobs:
       - name: "Tests"
         run: cargo test --all-targets --all
       - name: "pylib build"
-        run: maturin develop --manifest-path ./pylib/Cargo.toml
+        run: maturin build --manifest-path ./pylib/Cargo.toml --manylinux none
     env:
       RUST_BACKTRACE: 1
       RUSTFLAGS: "-D warnings"
