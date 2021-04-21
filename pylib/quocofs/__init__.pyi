@@ -14,47 +14,33 @@ KEY_LENGTH = 32
 HASH_LENGTH = 32
 UUID_LENGTH = 16
 
-
 class Session:
     def __new__(cls, path: str, key: bytes, remote: RemoteAccessorConfig):
         pass
-
     def object(self, id: bytes) -> bytes:
         pass
-
     def create_object(self, data: bytes) -> bytes:
         pass
-
     def modify_object(self, id: bytes, data: bytes) -> None:
         pass
-
     def delete_object(self, id: bytes) -> None:
         pass
-
     def object_id_with_name(self, name: str) -> typing.Optional[bytes]:
         pass
-
     def set_object_name(self, id: bytes, name: str) -> None:
         pass
-
     def flush(self) -> None:
         pass
-
     def object_temp_file(self, id: bytes) -> str:
         pass
-
     def clear_temp_files(self) -> None:
         pass
-
     def sync(self) -> None:
         pass
-
     def __enter__(self):
         pass
-
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
-
 
 # This class doesn't actually exist
 class RemoteAccessorConfig(ABC):
@@ -62,62 +48,47 @@ class RemoteAccessorConfig(ABC):
     def create(self) -> RemoteAccessorConfig:
         pass
 
-
 class GoogleStorageAccessorConfig(RemoteAccessorConfig):
     def __new__(cls, bucket: str, config_path: str):
         pass
-
     def create(self) -> GoogleStorageAccessorConfig:
         pass
-
 
 class EncryptionError(Exception):
     pass
 
-
 class DecryptionError(Exception):
     pass
-
 
 class EmptyInput(Exception):
     pass
 
-
 class KeyGenerationError(Exception):
     pass
-
 
 class NameTooLong(Exception):
     pass
 
-
 class InvalidMagicBytes(Exception):
     pass
-
 
 class EncryptionInputTooLong(Exception):
     pass
 
-
 class UndeterminedError(Exception):
     pass
-
 
 class SessionDisposed(Exception):
     pass
 
-
 class SessionPathLocked(Exception):
     pass
-
 
 class NoRemotes(Exception):
     pass
 
-
 class GoogleStorageError(Exception):
     pass
-
 
 def dumps(obj: bytes, key: bytes) -> bytes:
     """Return compressed, encrypted quoco data from ``obj`` as a ``bytes`` object.
@@ -128,7 +99,6 @@ def dumps(obj: bytes, key: bytes) -> bytes:
     """
     pass
 
-
 def loads(obj: bytes, key: bytes) -> bytes:
     """Return plaintext data from quocoed data ``obj`` as a ``bytes`` object.
 
@@ -137,7 +107,6 @@ def loads(obj: bytes, key: bytes) -> bytes:
     :return: Plaintext data
     """
     pass
-
 
 def key(password: str, salt: bytes) -> bytes:
     """Generate encryption key from password.
@@ -148,14 +117,12 @@ def key(password: str, salt: bytes) -> bytes:
     """
     pass
 
-
 def sha256(data: bytes) -> bytes:
     """Generate sha256 hash for data.
 
     :return: SHA-256 hash of ``data``
     """
     pass
-
 
 def serialize_hashes(hashes: dict[bytes, bytes]) -> bytes:
     """Serialize hashes file data.
@@ -165,7 +132,6 @@ def serialize_hashes(hashes: dict[bytes, bytes]) -> bytes:
     """
     pass
 
-
 def deserialize_hashes(data: bytes) -> dict[bytes, bytes]:
     """Deserialize hashes file data.
 
@@ -173,7 +139,6 @@ def deserialize_hashes(data: bytes) -> dict[bytes, bytes]:
     :return: Map from UUIDs to hashes
     """
     pass
-
 
 def serialize_names(names: dict[bytes, str]) -> bytes:
     """Serialize names file data.
@@ -183,7 +148,6 @@ def serialize_names(names: dict[bytes, str]) -> bytes:
     """
     pass
 
-
 def deserialize_names(data: bytes) -> dict[bytes, str]:
     """Deserialize hashes file data.
 
@@ -192,38 +156,29 @@ def deserialize_names(data: bytes) -> dict[bytes, str]:
     """
     pass
 
-
 class EncryptionError(Exception):
     pass
-
 
 class DecryptionError(Exception):
     pass
 
-
 class EmptyInput(Exception):
     pass
-
 
 class KeyGenerationError(Exception):
     pass
 
-
 class NameTooLong(Exception):
     pass
-
 
 class InvalidMagicBytes(Exception):
     pass
 
-
 class EncryptionInputTooLong(Exception):
     pass
 
-
 class UndeterminedError(Exception):
     pass
-
 
 __all__ = [
     "EncryptionError",
