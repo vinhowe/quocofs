@@ -31,6 +31,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
+          key: clippy
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -38,17 +39,20 @@ jobs:
           components: clippy
       - run: cargo clippy --all -- -D warnings
 
-  test:
+  build:
     needs: [ format ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install maturin
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
+          key: cargo-build
         continue-on-error: true
       # do a maturin build
       #      - uses: actions/setup-python@v2
@@ -57,7 +61,10 @@ jobs:
           toolchain: stable
           profile: minimal
           default: true
-      - run: cargo test --all-targets --all
+      - name: "Tests"
+        run: cargo test --all-targets --all
+      - name: "pylib build"
+        run: maturin develop --manifest-path ./pylib/Cargo.toml
     env:
       RUST_BACKTRACE: 1
       RUSTFLAGS: "-D warnings"
