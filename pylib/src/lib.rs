@@ -238,6 +238,7 @@ impl PyContextProtocol for PySession {
         _value: Option<&PyAny>,
         _traceback: Option<&PyAny>,
     ) -> PyResult<bool> {
+        self.clear_temp_files()?;
         self.push_remote()?;
         Ok(close_session(&self.id))
     }
