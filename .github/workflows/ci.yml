@@ -1,0 +1,60 @@
+# Based on https://github.com/PyO3/pyo3/blob/main/.github/workflows/ci.yml
+# and https://github.com/signalapp/Signal-Desktop/blob/development/.github/workflows/ci.yml
+
+name: CI
+on: [ push, pull_request ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install black
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: rustfmt
+      - name: Python Black formatting check
+        run: black --check .
+      - name: Rust rustfmt formatting check
+        run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy
+      - run: cargo clippy --all -- -D warnings
+
+  test:
+    needs: [ format ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+        continue-on-error: true
+      # do a maturin build
+      #      - uses: actions/setup-python@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          default: true
+      - run: cargo test --all-targets --all
+    env:
+      RUST_BACKTRACE: 1
+      RUSTFLAGS: "-D warnings"
+      RUSTDOCFLAGS: "-D warnings"
+      # TODO: Check if this ends up being needed
+      PYO3_CI: 1
