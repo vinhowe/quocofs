@@ -4,7 +4,7 @@ use crate::object::finish::Finish;
 use crate::object::{Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
 use crate::{ReadSeek, Result};
-use std::collections::hash_map::{Keys};
+use std::collections::hash_map::Keys;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};

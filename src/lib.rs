@@ -2,9 +2,9 @@ pub use uuid::Bytes as UuidBytes;
 
 use crate::error::QuocoError;
 pub use crate::session::SESSIONS;
-use std::result;
-use std::io::{Read, Seek, Cursor};
 use std::fs::File;
+use std::io::{Cursor, Read, Seek};
+use std::result;
 
 pub mod error;
 pub mod formats;

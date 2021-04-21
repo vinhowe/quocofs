@@ -11,7 +11,7 @@ use crate::object::fs_source::LOCK_FILE_NAME;
 use crate::object::{Finish, Key, ObjectHash, ObjectId, ObjectSource, QuocoReader, QuocoWriter};
 use crate::util::{bytes_to_hex_str, sha256};
 use crate::{ReadSeek, Result};
-use std::collections::hash_map::{Keys};
+use std::collections::hash_map::Keys;
 use std::time::SystemTime;
 
 const OBJECT_MIME_TYPE: &str = "application/octet-stream";

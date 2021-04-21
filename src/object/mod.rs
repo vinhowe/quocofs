@@ -12,8 +12,8 @@ pub use crate::object::google_storage_source::GoogleStorageObjectSource;
 pub use crate::object::quoco_reader::QuocoReader;
 pub use crate::object::quoco_writer::QuocoWriter;
 pub use crate::object::remote_source::{RemoteSource, RemoteSourceConfig};
-pub use crate::object::source::ObjectSource;
 pub use crate::object::source::BoxedObjectSource;
+pub use crate::object::source::ObjectSource;
 
 mod cached_source;
 mod decrypt_reader;
