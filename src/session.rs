@@ -198,7 +198,8 @@ impl Session {
                                 .map(|r| r as Box<dyn ReadSeek>)?,
                         )
                     } else {
-                        // TODO: Figure out race conditions so deleting works
+                        // TODO: Object syncing looks like it works well, but add tests to be sure
+                        //  that syncing doesn't incorrectly delete objects ever
                         // replica.delete_object(&id)
                         Ok(())
                     }
@@ -214,7 +215,8 @@ impl Session {
                     if add {
                         replica.set_object_name(&id, name.unwrap())
                     } else {
-                        // TODO: Figure out race conditions so deleting works
+                        // TODO: Object syncing looks like it works well, but add tests to be sure
+                        //  that syncing doesn't incorrectly delete objects ever
                         // replica.remove_object_name(&id)
                         Ok(())
                     }
