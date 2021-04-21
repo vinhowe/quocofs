@@ -99,7 +99,7 @@ impl ReferenceFormat for Names {
 impl Index<ObjectId> for Names {
     type Output = String;
 
-    fn index(&self, index: [u8; 16]) -> &Self::Output {
+    fn index(&self, index: ObjectId) -> &Self::Output {
         &self.data[&index]
     }
 }

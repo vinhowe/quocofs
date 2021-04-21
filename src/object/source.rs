@@ -17,7 +17,7 @@ pub trait ObjectSource {
     fn object_name(&self, id: &ObjectId) -> Result<Option<&String>>;
     fn object_id_with_name(&self, name: &str) -> Result<Option<&ObjectId>>;
     fn set_object_name(&mut self, id: &ObjectId, name: &str) -> Result<()>;
-    fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()>;
+    fn remove_object_name(&mut self, id: &ObjectId) -> Result<()>;
     fn last_updated(&self) -> &SystemTime;
     fn hashes_ids(&mut self) -> hash_map::Keys<'_, ObjectId, ObjectHash>;
     fn names_ids(&mut self) -> hash_map::Keys<'_, ObjectId, String>;

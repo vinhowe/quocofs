@@ -243,7 +243,7 @@ impl ObjectSource for GoogleStorageObjectSource {
         Ok(self.names.get_id(name))
     }
 
-    fn set_object_name(&mut self, id: &[u8; 16], name: &str) -> Result<()> {
+    fn set_object_name(&mut self, id: &ObjectId, name: &str) -> Result<()> {
         self.check_lock()?;
 
         self.names.insert(id, name);
@@ -251,7 +251,7 @@ impl ObjectSource for GoogleStorageObjectSource {
         Ok(())
     }
 
-    fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()> {
+    fn remove_object_name(&mut self, id: &ObjectId) -> Result<()> {
         self.check_lock()?;
 
         self.names.remove(id);

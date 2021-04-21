@@ -289,7 +289,7 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     _m.add_class::<PySession>()?;
 
     #[pyfn(_m, "dumps")]
-    fn dumps_py(py: Python, data: Vec<u8>, key: [u8; KEY_LENGTH]) -> PyResult<&PyBytes> {
+    fn dumps_py(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyBytes> {
         let compressed_encrypted_data = Vec::new();
         // compress_encrypt_data(&key, &mut Cursor::new(data), &mut compressed_encrypted_data)
         //     .map_err(PyQuocoError)?;
@@ -299,7 +299,7 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     }
 
     #[pyfn(_m, "loads")]
-    fn loads_py(py: Python, data: Vec<u8>, key: [u8; KEY_LENGTH]) -> PyResult<&PyBytes> {
+    fn loads_py(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyBytes> {
         let mut plaintext = Vec::new();
         QuocoReader::new(Cursor::new(data), &key)
             .read_to_end(&mut plaintext)

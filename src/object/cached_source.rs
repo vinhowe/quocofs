@@ -114,7 +114,7 @@ impl CachedObjectSource {
 impl Index<&ObjectId> for CachedObjectSource {
     type Output = [u8];
 
-    fn index(&self, index: &[u8; 16]) -> &Self::Output {
+    fn index(&self, index: &ObjectId) -> &Self::Output {
         &self.cache[index]
     }
 }
@@ -152,7 +152,7 @@ impl ObjectSource for CachedObjectSource {
         Ok(())
     }
 
-    fn object_hash(&self, id: &[u8; 16]) -> Result<Option<&ObjectHash>> {
+    fn object_hash(&self, id: &ObjectId) -> Result<Option<&ObjectHash>> {
         // Hashes and Names on inner source act as caches
         self.inner.object_hash(id)
     }
@@ -169,7 +169,7 @@ impl ObjectSource for CachedObjectSource {
         self.inner.set_object_name(id, name)
     }
 
-    fn remove_object_name(&mut self, id: &[u8; 16]) -> Result<()> {
+    fn remove_object_name(&mut self, id: &ObjectId) -> Result<()> {
         self.inner.remove_object_name(id)
     }
 
