@@ -14,6 +14,7 @@ use quocofs::*;
 use std::io;
 use std::io::{Cursor, Read};
 
+create_exception!(module, IoError, exceptions::PyException);
 create_exception!(module, EncryptionError, exceptions::PyException);
 create_exception!(module, DecryptionError, exceptions::PyException);
 create_exception!(module, EmptyInput, exceptions::PyException);
@@ -251,13 +252,14 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     // Constants
     _m.add("CHUNK_LENGTH", CHUNK_LENGTH).unwrap();
     _m.add("MAX_DATA_LENGTH", MAX_DATA_LENGTH).unwrap();
+    _m.add("KEY_LENGTH", KEY_LENGTH).unwrap();
     _m.add("MAX_NAME_LENGTH", MAX_NAME_LENGTH).unwrap();
     _m.add("SALT_LENGTH", SALT_LENGTH).unwrap();
-    _m.add("KEY_LENGTH", KEY_LENGTH).unwrap();
     _m.add("HASH_LENGTH", HASH_LENGTH).unwrap();
     _m.add("UUID_LENGTH", UUID_LENGTH).unwrap();
 
     // Exception types
+    _m.add("IoError", _py.get_type::<IoError>())?;
     _m.add("EncryptionError", _py.get_type::<EncryptionError>())?;
     _m.add("DecryptionError", _py.get_type::<DecryptionError>())?;
     _m.add("EmptyInput", _py.get_type::<EmptyInput>())?;
@@ -268,7 +270,9 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
         "EncryptionInputTooLong",
         _py.get_type::<EncryptionInputTooLong>(),
     )?;
-    _m.add("Undetermined", _py.get_type::<UndeterminedError>())?;
+    _m.add("UndeterminedError", _py.get_type::<UndeterminedError>())?;
+    _m.add("SessionDisposed", _py.get_type::<SessionDisposed>())?;
+    _m.add("SessionPathLocked", _py.get_type::<SessionPathLocked>())?;
     _m.add(
         "TempFileDeleteFailed",
         _py.get_type::<TempFileDeleteFailed>(),
@@ -277,13 +281,12 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
         "TempFileDeletesFailed",
         _py.get_type::<TempFileDeletesFailed>(),
     )?;
-    _m.add("SessionDisposed", _py.get_type::<SessionDisposed>())?;
-    _m.add("SessionPathLocked", _py.get_type::<SessionPathLocked>())?;
+    _m.add("NoRemotes", _py.get_type::<NoRemotes>())?;
     _m.add("GoogleStorageError", _py.get_type::<GoogleStorageError>())?;
 
     // Classes
-    _m.add_class::<PySession>()?;
     _m.add_class::<GoogleStorageAccessorConfig>()?;
+    _m.add_class::<PySession>()?;
 
     #[pyfn(_m, "dumps")]
     fn dumps_py(py: Python, data: Vec<u8>, key: [u8; KEY_LENGTH]) -> PyResult<&PyBytes> {

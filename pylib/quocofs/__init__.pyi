@@ -8,9 +8,9 @@ import typing
 
 CHUNK_LENGTH = 4096
 MAX_DATA_LENGTH = 4294967296
+KEY_LENGTH = 32
 MAX_NAME_LENGTH = 512
 SALT_LENGTH = 16
-KEY_LENGTH = 32
 HASH_LENGTH = 32
 UUID_LENGTH = 16
 
@@ -35,7 +35,9 @@ class Session:
         pass
     def clear_temp_files(self) -> None:
         pass
-    def sync(self) -> None:
+    def push_remote(self) -> None:
+        pass
+    def pull_remote(self) -> None:
         pass
     def __enter__(self):
         pass
@@ -53,6 +55,9 @@ class GoogleStorageAccessorConfig(RemoteAccessorConfig):
         pass
     def create(self) -> GoogleStorageAccessorConfig:
         pass
+
+class IoError(Exception):
+    pass
 
 class EncryptionError(Exception):
     pass
@@ -82,6 +87,12 @@ class SessionDisposed(Exception):
     pass
 
 class SessionPathLocked(Exception):
+    pass
+
+class TempFileDeletesFailed(Exception):
+    pass
+
+class TempFileDeleteFailed(Exception):
     pass
 
 class NoRemotes(Exception):
@@ -124,63 +135,18 @@ def sha256(data: bytes) -> bytes:
     """
     pass
 
-def serialize_hashes(hashes: dict[bytes, bytes]) -> bytes:
-    """Serialize hashes file data.
-
-    :param hashes: Map from UUIDs to hashes
-    :return: Binary hashes data
-    """
-    pass
-
-def deserialize_hashes(data: bytes) -> dict[bytes, bytes]:
-    """Deserialize hashes file data.
-
-    :param data: Binary hashes data
-    :return: Map from UUIDs to hashes
-    """
-    pass
-
-def serialize_names(names: dict[bytes, str]) -> bytes:
-    """Serialize names file data.
-
-    :param names: Map from UUIDs to names
-    :return: Binary names data
-    """
-    pass
-
-def deserialize_names(data: bytes) -> dict[bytes, str]:
-    """Deserialize hashes file data.
-
-    :param data: Binary names data
-    :return: Map from UUIDs to names
-    """
-    pass
-
-class EncryptionError(Exception):
-    pass
-
-class DecryptionError(Exception):
-    pass
-
-class EmptyInput(Exception):
-    pass
-
-class KeyGenerationError(Exception):
-    pass
-
-class NameTooLong(Exception):
-    pass
-
-class InvalidMagicBytes(Exception):
-    pass
-
-class EncryptionInputTooLong(Exception):
-    pass
-
-class UndeterminedError(Exception):
-    pass
-
 __all__ = [
+    "CHUNK_LENGTH",
+    "MAX_DATA_LENGTH",
+    "KEY_LENGTH",
+    "MAX_NAME_LENGTH",
+    "SALT_LENGTH",
+    "HASH_LENGTH",
+    "UUID_LENGTH",
+    "Session",
+    "RemoteAccessorConfig",
+    "GoogleStorageAccessorConfig",
+    "IoError",
     "EncryptionError",
     "DecryptionError",
     "EmptyInput",
@@ -189,20 +155,16 @@ __all__ = [
     "InvalidMagicBytes",
     "EncryptionInputTooLong",
     "UndeterminedError",
-    "CHUNK_LENGTH",
-    "HASH_LENGTH",
-    "KEY_LENGTH",
-    "MAX_DATA_LENGTH",
-    "SALT_LENGTH",
-    "UUID_LENGTH",
+    "SessionDisposed",
+    "SessionPathLocked",
+    "TempFileDeleteFailed",
+    "TempFileDeletesFailed",
+    "NoRemotes",
+    "GoogleStorageError",
     "dumps",
     "loads",
     "key",
     "sha256",
-    "serialize_hashes",
-    "deserialize_hashes",
-    "serialize_names",
-    "deserialize_names",
 ]
 
 __loader__ = None
