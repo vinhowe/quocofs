@@ -16,7 +16,9 @@ HASH_LENGTH = 32
 UUID_LENGTH = 16
 
 class Session:
-    def __new__(cls, path: str, key: bytes, remote: RemoteAccessorConfig):
+    def __new__(
+        cls, path: str, key: bytes, remote: typing.Optional[RemoteAccessorConfig]
+    ):
         pass
     def object(self, id: bytes) -> bytes:
         pass
