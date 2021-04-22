@@ -1,8 +1,9 @@
 use pyo3::exceptions;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyType};
+use pyo3::types::{PyBytes, PyDict, PyType};
 use pyo3::{create_exception, PyContextProtocol};
 use quocofs::error::QuocoError;
+use quocofs::formats::{Hashes, ReferenceFormat};
 use quocofs::object::{
     Finish, Key, ObjectId, ObjectSource, QuocoReader, QuocoWriter, RemoteSourceConfig,
     CHUNK_LENGTH, HASH_LENGTH, KEY_LENGTH, MAX_DATA_LENGTH, MAX_NAME_LENGTH, SALT_LENGTH,
@@ -12,7 +13,7 @@ use quocofs::session::{close_session, get_session, new_session};
 use quocofs::util::{generate_key, sha256};
 use quocofs::*;
 use std::io;
-use std::io::{Cursor, Read};
+use std::io::{BufReader, Cursor, Read};
 
 create_exception!(module, IoError, exceptions::PyException);
 create_exception!(module, EncryptionError, exceptions::PyException);
@@ -248,6 +249,26 @@ impl PyContextProtocol for PySession {
 }
 
 #[pymodule]
+fn init_hashes_module(_py: Python, _m: &PyModule) -> PyResult<()> {
+    #[pyfn(_m, "loads")]
+    fn loads(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyDict> {
+        let mut hashes = Hashes::default();
+        let py_hashes = PyDict::new(py);
+        hashes
+            .load(&mut BufReader::new(QuocoReader::new(
+                Cursor::new(data),
+                &key,
+            )))
+            .map_err(PyQuocoError)?;
+        hashes.iter().try_for_each(|(id, hash)| {
+            py_hashes.set_item(PyBytes::new(py, id), PyBytes::new(py, hash))
+        })?;
+        Ok(py_hashes)
+    }
+    Ok(())
+}
+
+#[pymodule]
 fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     // Constants
     _m.add("CHUNK_LENGTH", CHUNK_LENGTH).unwrap();
@@ -287,6 +308,11 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     // Classes
     _m.add_class::<GoogleStorageAccessorConfig>()?;
     _m.add_class::<PySession>()?;
+
+    // Submodules
+    let hashes_module = PyModule::new(_py, "hashes")?;
+    init_hashes_module(_py, hashes_module)?;
+    _m.add_submodule(hashes_module)?;
 
     #[pyfn(_m, "dumps")]
     fn dumps(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyBytes> {
