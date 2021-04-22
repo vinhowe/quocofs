@@ -3,12 +3,15 @@ use crate::object::{ObjectHash, ObjectId, HASH_LENGTH, UUID_LENGTH};
 use crate::Result;
 use std::collections::{hash_map, HashMap};
 use std::convert::TryInto;
+use std::io;
 use std::io::{BufRead, Read, Write};
 use std::mem::size_of;
 use std::ops::Index;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 type HashesDataType = HashMap<ObjectId, ObjectHash>;
+
+const ENTRY_LENGTH: usize = UUID_LENGTH + HASH_LENGTH;
 
 pub struct Hashes {
     last_updated: SystemTime,
@@ -65,12 +68,20 @@ impl ReferenceFormat for Hashes {
         let timestamp = u64::from_le_bytes(timestamp);
         self.last_updated = UNIX_EPOCH + Duration::from_millis(timestamp);
 
-        let mut entry_buf = [0u8; UUID_LENGTH + HASH_LENGTH];
+        let mut entry_buf = Vec::with_capacity(UUID_LENGTH + HASH_LENGTH);
         loop {
-            let entry_bytes_read = reader.read(&mut entry_buf)?;
+            entry_buf.clear();
+
+            let entry_bytes_read = reader
+                .take(ENTRY_LENGTH as u64)
+                .read_to_end(&mut entry_buf)?;
 
             if entry_bytes_read == 0 {
                 break;
+            }
+
+            if entry_bytes_read < UUID_LENGTH + HASH_LENGTH {
+                return Err(io::Error::from(io::ErrorKind::UnexpectedEof).into());
             }
 
             self.data.insert(
@@ -78,6 +89,7 @@ impl ReferenceFormat for Hashes {
                 entry_buf[UUID_LENGTH..].try_into()?,
             );
         }
+
         Ok(())
     }
 
@@ -90,9 +102,11 @@ impl ReferenceFormat for Hashes {
             .try_into()
             .unwrap();
         writer.write_all(&now.to_le_bytes())?;
-        for hash in self.data.iter() {
-            writer.write_all(hash.0)?;
-            writer.write_all(hash.1)?;
+        for (id, hash) in self.data.iter() {
+            assert_eq!(id.len(), UUID_LENGTH);
+            assert_eq!(hash.len(), HASH_LENGTH);
+            writer.write_all(id)?;
+            writer.write_all(hash)?;
         }
         Ok(())
     }

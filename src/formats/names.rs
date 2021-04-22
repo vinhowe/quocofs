@@ -2,6 +2,8 @@ use crate::formats::{ReferenceFormat, ReferenceFormatSpecification, NAMES};
 use crate::object::{ObjectId, UUID_LENGTH};
 use crate::Result;
 use std::collections::{hash_map, HashMap};
+use std::convert::TryInto;
+use std::io;
 use std::io::{BufRead, Read, Write};
 use std::ops::Index;
 
@@ -58,13 +60,18 @@ impl ReferenceFormat for Names {
 
     fn load<R: BufRead + Read>(&mut self, reader: &mut R) -> Result<()> {
         Self::check_magic_bytes(reader)?;
-        let mut uuid = [0u8; UUID_LENGTH];
+        let mut uuid = Vec::with_capacity(UUID_LENGTH);
 
         loop {
-            let uuid_bytes_read = reader.read(&mut uuid)?;
+            uuid.clear();
+            let uuid_bytes_read = reader.take(UUID_LENGTH as u64).read_to_end(&mut uuid)?;
 
             if uuid_bytes_read == 0 {
                 break;
+            }
+
+            if uuid_bytes_read < UUID_LENGTH {
+                return Err(io::Error::from(io::ErrorKind::UnexpectedEof).into());
             }
 
             let mut string_buffer = Vec::new();
@@ -72,7 +79,7 @@ impl ReferenceFormat for Names {
 
             let name = String::from_utf8(string_buffer[..name_bytes_read - 1].to_vec()).unwrap();
 
-            self.data.insert(uuid, name);
+            self.data.insert(uuid.as_slice().try_into().unwrap(), name);
         }
         Ok(())
     }
