@@ -9,7 +9,7 @@ name = "quocofs"
 crate-type = ["cdylib"]
 
 [dependencies]
-quocofs = { path = "../" }
+quocofs = { path = "../." }
 
 [dependencies.pyo3]
 #version = "0.13.2"
