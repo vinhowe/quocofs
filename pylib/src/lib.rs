@@ -10,7 +10,6 @@ use quocofs::object::{
     UUID_LENGTH,
 };
 use quocofs::session::{close_session, get_session, new_session};
-use quocofs::util::{generate_key, sha256};
 use quocofs::*;
 use std::io;
 use std::io::{BufReader, Cursor, Read};
@@ -337,7 +336,7 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     fn key(py: Python, password: String, salt: [u8; SALT_LENGTH]) -> PyResult<&PyBytes> {
         Ok(PyBytes::new(
             py,
-            &generate_key(&password, &salt).map_err(PyQuocoError)?,
+            &util::generate_key(&password, &salt).map_err(PyQuocoError)?,
         ))
     }
 
