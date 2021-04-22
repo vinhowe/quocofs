@@ -142,10 +142,16 @@ impl Session {
     }
 
     pub fn push_remote(&mut self) -> Result<()> {
+        if self.remote.is_none() {
+            return Ok(());
+        }
         self.sync(SyncFrom::Local)
     }
 
     pub fn pull_remote(&mut self) -> Result<()> {
+        if self.remote.is_none() {
+            return Ok(());
+        }
         self.sync(SyncFrom::Remote)
     }
 
