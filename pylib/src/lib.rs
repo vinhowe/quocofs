@@ -1,7 +1,7 @@
+use pyo3::create_exception;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyType};
-use pyo3::{create_exception, PyContextProtocol};
 use quocofs::error::QuocoError;
 use quocofs::formats::{Hashes, ReferenceFormat};
 use quocofs::object::{
@@ -122,6 +122,22 @@ impl PySession {
         })
     }
 
+    fn __enter__(&mut self) -> PyResult<()> {
+        self.pull_remote()
+    }
+
+    fn __exit__(
+        &mut self,
+        _ty: Option<&PyType>,
+        _value: Option<&PyAny>,
+        _traceback: Option<&PyAny>,
+    ) -> PyResult<bool> {
+        self.clear_temp_files()?;
+        self.flush()?;
+        self.push_remote()?;
+        Ok(close_session(&self.id))
+    }
+
     fn object<'p>(&self, py: Python<'p>, id: ObjectId) -> PyResult<&'p PyBytes> {
         let mut object_data = Vec::new();
         let mut object_reader = get_session(&self.id)
@@ -226,25 +242,6 @@ impl PySession {
             .map_err(PyQuocoError)?;
 
         Ok(())
-    }
-}
-
-#[pyproto]
-impl PyContextProtocol for PySession {
-    fn __enter__(&mut self) -> PyResult<()> {
-        self.pull_remote()
-    }
-
-    fn __exit__(
-        &mut self,
-        _ty: Option<&PyType>,
-        _value: Option<&PyAny>,
-        _traceback: Option<&PyAny>,
-    ) -> PyResult<bool> {
-        self.clear_temp_files()?;
-        self.flush()?;
-        self.push_remote()?;
-        Ok(close_session(&self.id))
     }
 }
 
