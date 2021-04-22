@@ -149,6 +149,14 @@ impl Session {
         self.sync(SyncFrom::Remote)
     }
 
+    pub fn flush(&mut self) -> Result<()> {
+        self.local.flush()?;
+        if let Some(remote) = &mut self.remote {
+            remote.flush()?
+        }
+        Ok(())
+    }
+
     fn sync(&mut self, direction: SyncFrom) -> Result<()> {
         // TODO: Implement an actual distributed change logging system:
         //  https://github.com/vinhowe/quocofs/issues/5
@@ -224,8 +232,7 @@ impl Session {
             )
         })?;
 
-        primary.flush()?;
-        replica.flush()?;
+        self.flush()?;
 
         Ok(())
     }
