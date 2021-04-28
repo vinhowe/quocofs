@@ -88,12 +88,12 @@ impl Session {
         })
     }
 
-    pub fn object_temp_file(&mut self, id: &ObjectId) -> Result<PathBuf> {
+    pub fn object_temp_file(&mut self, id: &ObjectId, ext: &str) -> Result<PathBuf> {
         if self.temp_files.contains_key(id) {
             return Ok(self.temp_files[id].clone());
         }
 
-        let temp_file_path = env::temp_dir().join(Path::new(&bytes_to_hex_str(id)));
+        let temp_file_path = env::temp_dir().join(Path::new(format!("{}.{}", bytes_to_hex_str(id), ext).as_str()));
         io::copy(
             &mut self.local.object(id)?,
             &mut File::create(temp_file_path.clone())?,

@@ -207,10 +207,10 @@ impl PySession {
             .map_err(PyQuocoError)?)
     }
 
-    fn object_temp_file(&self, id: ObjectId) -> PyResult<String> {
+    fn object_temp_file(&self, id: ObjectId, ext: &str) -> PyResult<String> {
         let path = get_session(&self.id)
             .borrow_mut()
-            .object_temp_file(&id)
+            .object_temp_file(&id, ext)
             .map(|path| path.to_str().unwrap().to_string())
             .map_err(PyQuocoError)?;
 

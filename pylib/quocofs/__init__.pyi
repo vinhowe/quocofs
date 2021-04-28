@@ -34,7 +34,7 @@ class Session:
         pass
     def flush(self) -> None:
         pass
-    def object_temp_file(self, id: bytes) -> str:
+    def object_temp_file(self, id: bytes, ext: str) -> str:
         pass
     def clear_temp_files(self) -> None:
         pass
