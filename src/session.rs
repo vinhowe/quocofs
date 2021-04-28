@@ -93,7 +93,9 @@ impl Session {
             return Ok(self.temp_files[id].clone());
         }
 
-        let temp_file_path = env::temp_dir().join(Path::new(format!("{}.{}", bytes_to_hex_str(id), ext).as_str()));
+        let temp_file_path = env::temp_dir().join(Path::new(
+            format!("{}.{}", bytes_to_hex_str(id), ext).as_str(),
+        ));
         io::copy(
             &mut self.local.object(id)?,
             &mut File::create(temp_file_path.clone())?,
