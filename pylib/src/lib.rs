@@ -247,7 +247,8 @@ impl PySession {
 
 #[pymodule]
 fn init_hashes_module(_py: Python, _m: &PyModule) -> PyResult<()> {
-    #[pyfn(_m, "loads")]
+    #[pyfn(_m)]
+    #[pyo3(name = "loads")]
     fn loads(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyDict> {
         let mut hashes = Hashes::default();
         let py_hashes = PyDict::new(py);
@@ -311,7 +312,8 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
     init_hashes_module(_py, hashes_module)?;
     _m.add_submodule(hashes_module)?;
 
-    #[pyfn(_m, "dumps")]
+    #[pyfn(_m)]
+    #[pyo3(name = "dumps")]
     fn dumps(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyBytes> {
         let compressed_encrypted_data = Vec::new();
         // compress_encrypt_data(&key, &mut Cursor::new(data), &mut compressed_encrypted_data)
@@ -321,7 +323,8 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
         Ok(PyBytes::new(py, &writer.finish()?))
     }
 
-    #[pyfn(_m, "loads")]
+    #[pyfn(_m)]
+    #[pyo3(name = "loads")]
     fn loads(py: Python, data: Vec<u8>, key: Key) -> PyResult<&PyBytes> {
         let mut plaintext = Vec::new();
         QuocoReader::new(Cursor::new(data), &key)
@@ -330,7 +333,8 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
         Ok(PyBytes::new(py, &plaintext))
     }
 
-    #[pyfn(_m, "key")]
+    #[pyfn(_m)]
+    #[pyo3(name = "key")]
     fn key(py: Python, password: String, salt: [u8; SALT_LENGTH]) -> PyResult<&PyBytes> {
         Ok(PyBytes::new(
             py,
@@ -338,7 +342,8 @@ fn quocofs(_py: Python, _m: &PyModule) -> PyResult<()> {
         ))
     }
 
-    #[pyfn(_m, "sha256")]
+    #[pyfn(_m)]
+    #[pyo3(name = "sha256")]
     fn sha256(py: Python, data: Vec<u8>) -> PyResult<&PyBytes> {
         let mut data_reader = Cursor::new(data);
 
