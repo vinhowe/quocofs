@@ -1,0 +1,7 @@
+[build-system]
+requires = ["maturin>=0.10"]
+build-backend = "maturin"
+
+[tool.maturin]
+manylinux = "off"
+sdist-include = ["./"]
