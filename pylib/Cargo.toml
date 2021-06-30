@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Vin Howe <24789592+vinhowe@users.noreply.github.com>"]
 edition = "2018"
 
+[package.metadata.maturin]
+name = "quocofs"
+
 [lib]
 name = "quocofs"
 crate-type = ["cdylib"]
