@@ -4,4 +4,3 @@ build-backend = "maturin"
 
 [tool.maturin]
 manylinux = "off"
-sdist-include = ["./"]
