@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "maturin>=0.10"]
+requires = ["maturin>=0.10"]
 build-backend = "maturin"
 
 [tool.maturin]
